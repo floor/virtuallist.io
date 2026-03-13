@@ -1,0 +1,130 @@
+<div class="bench-page bench-results-page">
+  <!-- Header -->
+  <header class="bench-header">
+    <div class="bench-header__top">
+      <h1 class="bench-header__title"><%= it.t("results.title") %></h1>
+    </div>
+    <p class="bench-header__desc"><%= it.t("results.desc") %></p>
+    <% if (it.totalRuns > 0) { %>
+    <div class="bench-header__meta">
+      <span class="bench-tag"><%= it.t("results.last_updated", { runs: it.totalRuns }) %></span>
+    </div>
+    <% } %>
+  </header>
+
+  <!-- Filters -->
+  <div class="bench-controls" id="res-controls">
+    <span class="bench-controls__label"><%= it.t("controls.items_label") %></span>
+    <div class="ui-segmented" id="res-sizes">
+      <% it.itemCounts.forEach(function(count) { %>
+      <button class="ui-segmented__btn<%= count === it.initialItemCount ? ' ui-segmented__btn--active' : '' %>" data-count="<%= count %>"><%= it.formatItemCount(count) %></button>
+      <% }) %>
+    </div>
+
+    <div class="bench-controls__sep"></div>
+    <span class="bench-controls__label"><%= it.t("controls.stress_label") %></span>
+    <div class="ui-segmented" id="res-stress">
+      <% it.stressLevels.forEach(function(level, i) { %>
+      <button class="ui-segmented__btn<%= i === 0 ? ' ui-segmented__btn--active' : '' %>" data-stress="<%= level.ms %>" title="<%= level.ms === 0 ? 'No extra CPU load' : 'Burn ' + level.ms + 'ms of CPU per frame during scroll' %>"><%= level.label %></button>
+      <% }) %>
+    </div>
+  </div>
+
+  <!-- Results Table -->
+  <% if (it.rows.length === 0) { %>
+  <div class="res-empty">
+    <p class="res-empty__text"><%= it.t("results.empty") %></p>
+  </div>
+  <% } else { %>
+  <div class="res-table-wrap" id="res-table-wrap">
+    <table class="res-table" id="res-table">
+      <thead>
+        <tr>
+          <th class="res-table__th res-table__th--rank">#</th>
+          <th class="res-table__th res-table__th--library"><%= it.t("results.table_library") %></th>
+          <th class="res-table__th res-table__th--metric res-table__th--sortable" data-metric="Render" data-better="lower"><%= it.t("results.table_render") %></th>
+          <th class="res-table__th res-table__th--metric res-table__th--sortable" data-metric="Memory" data-better="lower"><%= it.t("results.table_memory") %></th>
+          <th class="res-table__th res-table__th--metric res-table__th--sortable res-table__th--sorted" data-metric="Scroll FPS" data-better="higher"><%= it.t("results.table_fps") %></th>
+          <th class="res-table__th res-table__th--metric res-table__th--sortable" data-metric="P95 Frame" data-better="lower"><%= it.t("results.table_p95") %></th>
+          <th class="res-table__th res-table__th--runs"><%= it.t("results.table_runs") %></th>
+        </tr>
+      </thead>
+      <tbody id="res-tbody">
+        <% it.rows.forEach(function(row, i) { %>
+        <tr class="res-table__row" data-slug="<%= row.slug %>">
+          <td class="res-table__td res-table__td--rank"><%= i + 1 %></td>
+          <td class="res-table__td res-table__td--library">
+            <a href="/benchmarks/<%= row.slug %>" class="res-lib">
+              <span class="res-lib__name"><%= row.name %></span>
+              <span class="res-lib__eco"><%= row.ecosystem %></span>
+            </a>
+          </td>
+          <td class="res-table__td res-table__td--metric<%= row.render.best ? ' res-table__td--best' : '' %>" data-value="<%= row.render.value %>">
+            <% if (row.render.value !== null) { %>
+            <span class="res-val"><%= row.render.display %></span>
+            <span class="res-unit"><%= row.render.unit %></span>
+            <% if (row.render.range) { %>
+            <span class="res-range"><%= row.render.range %></span>
+            <% } %>
+            <% } else { %>
+            <span class="res-nodata"><%= it.t("results.no_data") %></span>
+            <% } %>
+          </td>
+          <td class="res-table__td res-table__td--metric<%= row.memory.best ? ' res-table__td--best' : '' %>" data-value="<%= row.memory.value %>">
+            <% if (row.memory.value !== null) { %>
+            <span class="res-val"><%= row.memory.display %></span>
+            <span class="res-unit"><%= row.memory.unit %></span>
+            <% if (row.memory.range) { %>
+            <span class="res-range"><%= row.memory.range %></span>
+            <% } %>
+            <% } else { %>
+            <span class="res-nodata"><%= it.t("results.no_data") %></span>
+            <% } %>
+          </td>
+          <td class="res-table__td res-table__td--metric<%= row.fps.best ? ' res-table__td--best' : '' %>" data-value="<%= row.fps.value %>">
+            <% if (row.fps.value !== null) { %>
+            <span class="res-val"><%= row.fps.display %></span>
+            <span class="res-unit"><%= row.fps.unit %></span>
+            <% if (row.fps.range) { %>
+            <span class="res-range"><%= row.fps.range %></span>
+            <% } %>
+            <% } else { %>
+            <span class="res-nodata"><%= it.t("results.no_data") %></span>
+            <% } %>
+          </td>
+          <td class="res-table__td res-table__td--metric<%= row.p95.best ? ' res-table__td--best' : '' %>" data-value="<%= row.p95.value %>">
+            <% if (row.p95.value !== null) { %>
+            <span class="res-val"><%= row.p95.display %></span>
+            <span class="res-unit"><%= row.p95.unit %></span>
+            <% if (row.p95.range) { %>
+            <span class="res-range"><%= row.p95.range %></span>
+            <% } %>
+            <% } else { %>
+            <span class="res-nodata"><%= it.t("results.no_data") %></span>
+            <% } %>
+          </td>
+          <td class="res-table__td res-table__td--runs">
+            <span class="res-runs__count"><%= row.totalRuns %></span>
+            <span class="res-runs__badge res-runs__badge--<%= row.confidence %>">
+              <% if (row.confidence === 'high') { %>🟢<% } else if (row.confidence === 'moderate') { %>🟡<% } else { %>⚪<% } %>
+            </span>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Confidence Legend -->
+  <div class="res-legend">
+    <span class="res-legend__item">🟢 <%= it.t("results.confidence_high") %> (≥ 20)</span>
+    <span class="res-legend__item">🟡 <%= it.t("results.confidence_moderate") %> (5–19)</span>
+    <span class="res-legend__item">⚪ <%= it.t("results.confidence_low") %> (&lt; 5)</span>
+  </div>
+
+  <!-- Footer Note -->
+  <div class="res-footer">
+    <p class="res-footer__note"><%= it.t("results.footer_note") %></p>
+  </div>
+  <% } %>
+</div>

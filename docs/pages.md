@@ -1,6 +1,6 @@
 # Page Renderers
 
-Four page renderers live in `src/server/pages/`. Each one is a TypeScript function that builds an HTML content string and passes it to `renderShell()` to produce a complete document. Rendered HTML is cached in a module-level variable after the first request and reused for all subsequent ones. In development (`IS_PROD = false`) the cache is bypassed so changes are reflected without restarting the server.
+Four page renderers live in `src/server/pages/`. Each one is a TypeScript function that builds an HTML content string and passes it to `renderShell()` to produce a complete document. Rendered HTML is cached in a module-level variable after the first request and reused for all subsequent ones. In development (`IS_PROD = false`) the cache is bypassed so changes are reflected without restarting the server. The results page is an exception — it is not cached in production because its content changes as new benchmark runs are submitted (a short `Cache-Control: max-age=300` header is used instead).
 
 Page-specific CSS is passed via the `extraHead` slot as an inline `<style>` block. This co-locates styles with the markup that needs them and avoids loading benchmark-specific CSS on the methodology page and vice versa.
 
@@ -13,6 +13,7 @@ Page-specific CSS is passed via the `extraHead` slot as an inline `<style>` bloc
 | `/` | `home.ts` | none |
 | `/benchmarks` | `benchmarks.ts` → `assembleOverviewPage()` | none |
 | `/benchmarks/compare` | `benchmarks.ts` → `assembleComparePage()` | `compare.js` |
+| `/benchmarks/results` | `benchmarks.ts` → `assembleResultsPage()` | `results.js` |
 | `/benchmarks/{slug}` | `benchmarks.ts` → `assembleLibraryPage()` | `script.js` |
 | `/methodology` | `methodology.ts` | none |
 | `/about` | `about.ts` | none |
@@ -182,6 +183,82 @@ The compare page uses `BENCH_CSS` (shared with all benchmark pages) plus `COMPAR
 | `.cmp-diff-badge--winner`, `.cmp-diff-badge--tie`, `.cmp-diff-badge--worse` | Diff badge variants |
 | `.cmp-cell__value`, `.cmp-cell__unit`, `.cmp-cell__meta` | Cell value typography |
 | `.cmp-results__footer` | Footer note |
+
+---
+
+## Results Page (`src/server/pages/benchmarks.ts` → `assembleResultsPage()`)
+
+**URL:** `/benchmarks/results`
+**Active nav:** "Benchmarks"
+**Sidebar active link:** "📊 Results"
+**JavaScript shipped:** `<script type="module" src="/dist/benchmarks/results.js">` (injected via `extraBody`)
+
+The results page shows crowdsourced aggregated benchmark data from the SQLite database. Unlike the compare page (which runs benchmarks live in the visitor's browser), this page is fully server-rendered from stored data — no benchmark execution is needed.
+
+### Data flow
+
+`assembleResultsPage()` calls `getStats()` and `getSummary()` (exported from `src/api/benchmarks.ts`) directly on the server. The query filters by item count and stress level, which are read from URL query parameters (`?items=10000&stress=0`). The results are transformed into template-ready row objects by `buildResultRows()`, which:
+
+1. Merges stats by library slug (takes the version group with the most runs)
+2. Filters to libraries that exist in the registry (unknown slugs are skipped)
+3. Extracts the 4 core metrics (Render, Memory, Scroll FPS, P95 Frame) into typed cell objects
+4. Sorts by Scroll FPS descending (default ranking)
+5. Marks the best value per metric column
+
+### Leaderboard table
+
+The main content is an HTML `<table>` with one row per library. Columns:
+
+| Column | Content |
+|--------|---------|
+| `#` | Rank (1-based, from current sort order) |
+| Library | Name (links to `/benchmarks/{slug}`) + ecosystem badge |
+| Render | Median render time in ms |
+| Memory | Median memory usage in MB |
+| Scroll FPS | Median scroll FPS |
+| P95 Frame | Median P95 frame time in ms |
+| Runs | Sample count + confidence badge (🟢🟡⚪) |
+
+Each metric cell shows: the median value, the unit, and (when ≥ 3 samples) a p5–p95 range below the value. The best value in each column gets a green highlight via the `res-table__td--best` class.
+
+### Confidence badges
+
+Based on the `totalRuns` count for each library:
+
+- 🟢 **High confidence** — ≥ 20 runs
+- 🟡 **Moderate confidence** — 5–19 runs
+- ⚪ **Low confidence** — < 5 runs
+
+A legend below the table explains the badges.
+
+### Filter controls
+
+Item count (10K / 100K / 1M) and stress level (0 / 3 / 5 / 7 ms) segmented buttons. Clicking a filter navigates to the same page with updated query parameters (`?items=100000&stress=3`), triggering a fresh server render with the new filter applied.
+
+### Column sorting
+
+Column headers with the `res-table__th--sortable` class support client-side re-sorting. Clicking a header sorts the rows by that metric (ascending for lower-is-better metrics, descending for higher-is-better). Re-clicking toggles the direction. The active sort column is highlighted with the `res-table__th--sorted` class. Rank numbers in the `#` column are updated after each sort.
+
+### Caching
+
+Unlike other benchmark pages, the results page is **not** cached in the module-level `pageCache`. The data changes as new runs are submitted. Instead, a `Cache-Control: public, max-age=300` header is set in production (5-minute browser cache). In development, `no-cache` is used.
+
+### Empty state
+
+When no data exists for the current filter combination, a `.res-empty` card is shown with a message encouraging the visitor to run benchmarks.
+
+### CSS
+
+Results-specific styles are in the `RESULTS_CSS` constant, appended after `COMPARE_CSS`. Key classes:
+
+- `.res-table-wrap` — rounded border container with horizontal scroll on narrow screens
+- `.res-table` — full-width table with `tabular-nums` for aligned numbers
+- `.res-table__td--best` — subtle green background + green text for the winner
+- `.res-lib` — library name link with ecosystem badge
+- `.res-val`, `.res-unit`, `.res-range` — metric value formatting
+- `.res-runs__badge` — confidence emoji badge
+- `.res-legend` — horizontal legend bar below the table
+- `.res-empty` — centered empty state card
 
 ---
 

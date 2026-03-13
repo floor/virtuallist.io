@@ -1,6 +1,6 @@
 # virtuallist.io
 
-Independent, open-source benchmark platform for virtual list libraries.
+Open-source benchmark platform for virtual list libraries.
 
 **Live site:** [virtuallist.io](https://virtuallist.io)
 
@@ -63,11 +63,13 @@ Scroll performance is tested at **7 progressive speeds** (720 px/s → 36,000 px
 
 ## Crowdsourced Data
 
-Every benchmark run is automatically stored in a SQLite database (fire-and-forget POST — never blocks the UI). The history page aggregates results across devices, browsers, and library versions with confidence indicators:
+Every benchmark run is automatically stored in a SQLite database (fire-and-forget POST — never blocks the UI). The **[Results page](https://virtuallist.io/benchmarks/results)** aggregates this data into a leaderboard table showing median performance across all libraries, with confidence indicators based on sample count:
 
 - 🟢 **High confidence** — ≥ 20 runs
 - 🟡 **Moderate confidence** — 5–19 runs
 - ⚪ **Low confidence** — < 5 runs
+
+Results are filterable by item count (10K / 100K / 1M) and CPU stress level (0 / 3 / 5 / 7 ms). Column headers are sortable. Best-in-column values are highlighted.
 
 ## Tech Stack
 
@@ -93,7 +95,7 @@ virtuallist.io/
 │   │   ├── registry.ts        # Library registry — central source of truth
 │   │   └── pages/
 │   │       ├── home.ts        # Homepage renderer
-│   │       ├── benchmarks.ts  # Benchmark overview + individual library pages
+│   │       ├── benchmarks.ts  # Benchmark overview, individual, compare & results pages
 │   │       └── methodology.ts # Methodology documentation page
 │   └── api/
 │       ├── router.ts          # API route dispatcher
@@ -101,6 +103,8 @@ virtuallist.io/
 ├── benchmarks/
 │   ├── runner.js              # Core measurement engine (library-agnostic)
 │   ├── script.js              # Browser entry point — wires UI and runner
+│   ├── compare.js             # Compare page — multi-library head-to-head
+│   ├── results.js             # Results page — filter controls and column sorting
 │   ├── build.ts               # Bun bundler build script
 │   └── libraries/
 │       ├── _TEMPLATE.js       # Template for new library adapters
@@ -155,6 +159,8 @@ Server starts at **http://localhost:3456**
 |-------|-------------|
 | `/` | Homepage |
 | `/benchmarks` | Benchmark overview (all libraries) |
+| `/benchmarks/compare` | Head-to-head live comparison |
+| `/benchmarks/results` | Crowdsourced aggregated results |
 | `/benchmarks/{slug}` | Individual library benchmark |
 | `/methodology` | Methodology documentation |
 | `/api/benchmarks` | POST — store a result |

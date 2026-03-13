@@ -6,18 +6,25 @@ Known gaps, unfinished work, and planned improvements. This document reflects th
 
 ## Missing Features
 
-### History / Trends Page
+### ~~History / Trends Page~~ → Partially resolved by Results page
 
-**What:** A page at `/benchmarks/{slug}/history` (or `/history`) that visualises the crowdsourced aggregate data over time.
+**What:** A page that surfaces crowdsourced aggregate data so visitors can see benchmark results without running benchmarks themselves.
 
-**Status:** The API endpoints are fully implemented (`/api/benchmarks/history`, `/api/benchmarks/stats`). The data is being stored. The page renderer and client-side chart do not exist yet.
+**Status:** ✅ **Partially resolved.** The **Results page** (`/benchmarks/results`) now exists. It shows a server-rendered leaderboard table with median values for all 4 core metrics, confidence badges, p5–p95 ranges, best-in-column highlighting, and filters for item count + stress level. Column headers are sortable client-side.
 
-**What it needs:**
-- A new page renderer in `src/server/pages/`
-- A route in `src/server/router.ts`
-- A client-side SVG or canvas chart drawing daily median + p5/p95 band
-- A library version selector and metric selector
-- Confidence badges (🟢 ≥20 runs, 🟡 5–19, ⚪ <5)
+**What was built:**
+- `assembleResultsPage()` in `src/server/pages/benchmarks.ts` — queries `getStats()` and `getSummary()` directly (no HTTP round-trip)
+- `benchmarks-results.eta` template — leaderboard table with confidence badges
+- `benchmarks/results.js` — lightweight (~2 KB) client-side script for filter navigation and column sorting
+- Route at `/benchmarks/results` in `src/server/router.ts`
+- Sidebar link ("📊 Results") visible on all benchmark pages
+- Sitemap entry
+
+**Still missing — time-series trends:**
+- A chart visualising performance over time (daily median + p5/p95 band)
+- The `/api/benchmarks/history` endpoint is fully implemented but no UI consumes it yet
+- A library version selector and metric selector for the chart
+- This could be added as an expansion of the results page or as a separate `/benchmarks/trends` page
 
 ---
 
@@ -25,12 +32,13 @@ Known gaps, unfinished work, and planned improvements. This document reflects th
 
 **What:** Show aggregated results from all previous visitors on the individual library benchmark page, below the controls.
 
-**Status:** Data is stored. No UI surfaces it.
+**Status:** Partially addressed. The Results page (`/benchmarks/results`) now shows aggregated data for all libraries. However, individual library pages (`/benchmarks/{slug}`) still do not show crowdsourced data inline.
 
 **What it needs:**
 - A fetch from `/api/benchmarks/stats?librarySlug={slug}&itemCount=10000` on page load
 - A "Community results" card rendered below the controls using the same `.bench-metric` component classes
 - Graceful empty state when no data exists yet
+- Alternatively, a server-side approach like the results page (call `getStats()` directly during page assembly)
 
 ---
 

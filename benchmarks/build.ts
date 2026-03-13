@@ -159,6 +159,7 @@ async function build(): Promise<void> {
 
   const entrypoint = join(BENCHMARKS_DIR, "script.js");
   const compareEntrypoint = join(BENCHMARKS_DIR, "compare.js");
+  const resultsEntrypoint = join(BENCHMARKS_DIR, "results.js");
   const runnerPath = join(BENCHMARKS_DIR, "runner.js");
 
   if (!existsSync(entrypoint)) {
@@ -168,6 +169,11 @@ async function build(): Promise<void> {
 
   if (!existsSync(compareEntrypoint)) {
     console.error("❌ benchmarks/compare.js not found");
+    process.exit(1);
+  }
+
+  if (!existsSync(resultsEntrypoint)) {
+    console.error("❌ benchmarks/results.js not found");
     process.exit(1);
   }
 
@@ -240,6 +246,26 @@ async function build(): Promise<void> {
     }
     console.log("  ✅ compare.js");
 
+    // ── Build results.js (results page entry point) ─────────────────────
+    console.log("  Building results.js...");
+    const resultsResult = await Bun.build({
+      entrypoints: [resultsEntrypoint],
+      outdir: OUT_DIR,
+      ...buildOptions(),
+      define,
+    });
+
+    if (!resultsResult.success) {
+      const errors = resultsResult.logs.map((log) => log.message).join("\n");
+      console.error("❌ Results build failed:\n", errors);
+      console.error("\nBuild logs:");
+      resultsResult.logs.forEach((log) => {
+        console.error(`  ${log.level}: ${log.message}`);
+      });
+      process.exit(1);
+    }
+    console.log("  ✅ results.js");
+
     // ── Collect CSS ─────────────────────────────────────────────────────
     // Bundle required stylesheets from library packages, then any local
     // overrides. Order matters — later rules win on conflicts.
@@ -300,6 +326,8 @@ async function build(): Promise<void> {
 
     const jsSize = Bun.file(jsPath).size;
     const compareSize = Bun.file(compareOutPath).size;
+    const resultsOutPath = join(OUT_DIR, "results.js");
+    const resultsSize = Bun.file(resultsOutPath).size;
     const runnerSize = Bun.file(runnerOutPath).size;
 
     const elapsed = (performance.now() - start).toFixed(0);
@@ -309,6 +337,7 @@ async function build(): Promise<void> {
 
   script.js   ${formatKB(jsSize)} KB
   compare.js  ${formatKB(compareSize)} KB
+  results.js  ${formatKB(resultsSize)} KB
   runner.js   ${formatKB(runnerSize)} KB
   Output:     ${OUT_DIR}/
     `);

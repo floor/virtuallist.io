@@ -1,9 +1,11 @@
 // src/server/pages/benchmarks.ts
-// Benchmark page renderer — overview and individual library benchmark pages.
+// Benchmark page renderer — overview, individual, compare, and results pages.
 //
 // Renders:
 //   /benchmarks          → Overview with all libraries grouped by ecosystem
 //   /benchmarks/{slug}   → Individual library benchmark page (interactive)
+//   /benchmarks/compare  → Head-to-head live comparison
+//   /benchmarks/results  → Crowdsourced aggregated results from the database
 //
 // All HTML lives in src/templates/benchmarks-*.eta.
 // All user-facing strings live in locales/{locale}/benchmarks.json + common.json.
@@ -15,12 +17,19 @@ import { renderShell } from "../shell";
 import { makeT, detectLocale, type Locale } from "../i18n";
 import {
   getLibrary,
+  getLibraries as getRegistryLibraries,
   getLibrariesByEcosystem,
   getEcosystemLabel,
   getLibraryCount,
   type LibraryInfo,
   type Ecosystem,
 } from "../registry";
+import {
+  getStats,
+  getSummary,
+  type StatsResult,
+  type AggregatedMetric,
+} from "../../api/benchmarks";
 
 // =============================================================================
 // Cache (keyed by locale + slug for multi-language support)
@@ -229,6 +238,222 @@ function assembleComparePage(locale: string): string {
 }
 
 // =============================================================================
+// Results Page — Crowdsourced Aggregated Data
+// =============================================================================
+
+/** Metric labels in display order. */
+const METRIC_ORDER = ["Render", "Memory", "Scroll FPS", "P95 Frame"] as const;
+
+/** Map a metric label to a short key used in template row objects. */
+function metricKey(label: string): "render" | "memory" | "fps" | "p95" {
+  switch (label) {
+    case "Render":
+      return "render";
+    case "Memory":
+      return "memory";
+    case "Scroll FPS":
+      return "fps";
+    case "P95 Frame":
+      return "p95";
+    default:
+      return "render";
+  }
+}
+
+/** Confidence tier based on sample count. */
+function confidenceTier(runs: number): "high" | "moderate" | "low" {
+  if (runs >= 20) return "high";
+  if (runs >= 5) return "moderate";
+  return "low";
+}
+
+/** Format a numeric value for display (2 decimal places, strip trailing zeros). */
+function formatMetricValue(value: number, unit: string): string {
+  if (unit === "fps") return value.toFixed(1);
+  if (unit === "MB") return value.toFixed(2);
+  return value.toFixed(1);
+}
+
+interface MetricCell {
+  value: number | null;
+  display: string;
+  unit: string;
+  range: string | null;
+  best: boolean;
+}
+
+interface ResultRow {
+  slug: string;
+  name: string;
+  ecosystem: string;
+  totalRuns: number;
+  confidence: "high" | "moderate" | "low";
+  render: MetricCell;
+  memory: MetricCell;
+  fps: MetricCell;
+  p95: MetricCell;
+}
+
+function emptyCell(): MetricCell {
+  return { value: null, display: "", unit: "", range: null, best: false };
+}
+
+function buildResultRows(
+  stats: StatsResult[],
+  registryLibs: ReadonlyArray<LibraryInfo>,
+): ResultRow[] {
+  // Build a slug→name+ecosystem lookup from the registry
+  const libInfo = new Map<string, { name: string; ecosystem: string }>();
+  for (const lib of registryLibs) {
+    libInfo.set(lib.slug, {
+      name: lib.name,
+      ecosystem: getEcosystemLabel(lib.ecosystem),
+    });
+  }
+
+  // Merge stats by slug (getStats may return multiple version groups per slug)
+  // We take the group with the most runs per slug.
+  const bySlug = new Map<string, StatsResult>();
+  for (const s of stats) {
+    const existing = bySlug.get(s.librarySlug);
+    if (!existing || s.totalRuns > existing.totalRuns) {
+      bySlug.set(s.librarySlug, s);
+    }
+  }
+
+  // Build rows
+  const rows: ResultRow[] = [];
+
+  for (const [slug, stat] of bySlug) {
+    const info = libInfo.get(slug);
+    if (!info) continue; // skip unknown slugs not in registry
+
+    const row: ResultRow = {
+      slug,
+      name: info.name,
+      ecosystem: info.ecosystem,
+      totalRuns: stat.totalRuns,
+      confidence: confidenceTier(stat.totalRuns),
+      render: emptyCell(),
+      memory: emptyCell(),
+      fps: emptyCell(),
+      p95: emptyCell(),
+    };
+
+    for (const metric of stat.metrics) {
+      const key = metricKey(metric.label);
+      const p5 = formatMetricValue(metric.p5, metric.unit);
+      const p95 = formatMetricValue(metric.p95, metric.unit);
+
+      row[key] = {
+        value: metric.median,
+        display: formatMetricValue(metric.median, metric.unit),
+        unit: metric.unit,
+        range: metric.sampleCount >= 3 ? `${p5}–${p95}` : null,
+        best: false,
+      };
+    }
+
+    rows.push(row);
+  }
+
+  // Sort by Scroll FPS median (descending — higher is better) as default
+  rows.sort((a, b) => {
+    const aVal = a.fps.value ?? -Infinity;
+    const bVal = b.fps.value ?? -Infinity;
+    return bVal - aVal;
+  });
+
+  // Mark "best" per metric column
+  for (const key of ["render", "memory", "fps", "p95"] as const) {
+    const better = key === "fps" ? "higher" : "lower";
+    let bestVal: number | null = null;
+
+    for (const row of rows) {
+      const val = row[key].value;
+      if (val === null) continue;
+      if (bestVal === null) {
+        bestVal = val;
+      } else if (better === "lower" && val < bestVal) {
+        bestVal = val;
+      } else if (better === "higher" && val > bestVal) {
+        bestVal = val;
+      }
+    }
+
+    if (bestVal !== null) {
+      for (const row of rows) {
+        if (row[key].value === bestVal) {
+          row[key].best = true;
+        }
+      }
+    }
+  }
+
+  return rows;
+}
+
+function assembleResultsPage(
+  locale: string,
+  itemCount: number,
+  stressMs: number,
+): string {
+  const t = makeT(locale, "benchmarks");
+  const ecosystems = buildEcosystemData();
+  const registryLibs = getRegistryLibraries();
+
+  // Query aggregated stats from the database
+  let stats: StatsResult[] = [];
+  let totalRuns = 0;
+
+  try {
+    stats = getStats({ itemCount, stressMs, limit: 200 });
+    const summary = getSummary();
+    totalRuns =
+      typeof summary.successful_runs === "number" ? summary.successful_runs : 0;
+  } catch {
+    // DB may not exist yet — render empty state
+  }
+
+  const rows = buildResultRows(stats, registryLibs);
+
+  const resultsContent = renderTemplate("benchmarks-results", {
+    t,
+    rows,
+    totalRuns,
+    itemCounts: ITEM_COUNTS,
+    initialItemCount: itemCount,
+    stressLevels: STRESS_LEVELS,
+    formatItemCount,
+  });
+
+  const sidebar = renderTemplate("benchmarks-sidebar", {
+    t,
+    ecosystems,
+    activeSlug: "results",
+  });
+
+  return renderShell({
+    locale,
+    title: t("meta.results_title"),
+    description: t("meta.results_description"),
+    url: `${SITE}/benchmarks/results`,
+    content: `
+      <div class="bench-layout">
+        ${sidebar}
+        <div class="bench-layout__content">
+          ${resultsContent}
+        </div>
+      </div>`,
+    t,
+    activeNav: "benchmarks",
+    extraHead: `<style>${BENCH_CSS}${COMPARE_CSS}${RESULTS_CSS}</style>`,
+    extraBody: `<script type="module" src="/dist/benchmarks/results.js"></script>`,
+    mainClass: "",
+  });
+}
+
+// =============================================================================
 // Public API
 // =============================================================================
 
@@ -289,6 +514,48 @@ export function renderComparePage(req: Request): Response {
   pageCache.set(cacheKey, html);
 
   return new Response(html, htmlHeaders());
+}
+
+/**
+ * Render the results page (/benchmarks/results).
+ *
+ * Unlike other benchmark pages, this one is NOT cached in production because
+ * the data changes as new benchmark runs come in. Instead we use a short
+ * Cache-Control header so the browser doesn't re-fetch on every navigation
+ * but the data stays reasonably fresh.
+ *
+ * Supports query params:
+ *   ?items=10000   — item count filter (default: 10000)
+ *   ?stress=0      — stress ms filter (default: 0)
+ *
+ * @param req - HTTP request (for locale detection + query params).
+ */
+export function renderResultsPage(req: Request): Response {
+  const locale = detectLocale(req);
+  const url = new URL(req.url);
+
+  // Parse filter params with safe defaults
+  const itemCount = parseIntParam(url, "items", INITIAL_ITEM_COUNT);
+  const stressMs = parseIntParam(url, "stress", 0);
+
+  const html = assembleResultsPage(locale, itemCount, stressMs);
+
+  return new Response(html, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": IS_PROD
+        ? "public, max-age=300, must-revalidate"
+        : "no-cache, no-store, must-revalidate",
+    },
+  });
+}
+
+/** Parse an integer query param, returning a default if missing or invalid. */
+function parseIntParam(url: URL, name: string, fallback: number): number {
+  const raw = url.searchParams.get(name);
+  if (!raw) return fallback;
+  const n = parseInt(raw, 10);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
 }
 
 // =============================================================================
@@ -1256,6 +1523,228 @@ const BENCH_CSS = `
 @media (max-width: 480px) {
   .bench-metrics {
     grid-template-columns: 1fr;
+  }
+}
+`.trim();
+
+const RESULTS_CSS = `
+/* ── Results: Table Wrapper ─────────────────────────────────────────────── */
+.res-table-wrap {
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  overflow-x: auto;
+  margin-top: 1rem;
+}
+.res-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Results: Header ────────────────────────────────────────────────────── */
+.res-table__th {
+  padding: 0.65rem 1rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  text-align: left;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  white-space: nowrap;
+  user-select: none;
+}
+.res-table__th--rank {
+  width: 40px;
+  text-align: center;
+}
+.res-table__th--library {
+  min-width: 160px;
+}
+.res-table__th--metric {
+  text-align: right;
+  min-width: 100px;
+}
+.res-table__th--runs {
+  text-align: center;
+  width: 80px;
+}
+.res-table__th--sortable {
+  cursor: pointer;
+  transition: color var(--transition);
+}
+.res-table__th--sortable:hover {
+  color: var(--text-secondary);
+}
+.res-table__th--sorted {
+  color: var(--accent);
+}
+
+/* ── Results: Rows ──────────────────────────────────────────────────────── */
+.res-table__row {
+  border-bottom: 1px solid var(--border-subtle);
+  transition: background var(--transition);
+}
+.res-table__row:last-child {
+  border-bottom: none;
+}
+.res-table__row:hover {
+  background: var(--bg-elevated);
+}
+.res-table__td {
+  padding: 0.6rem 1rem;
+  font-size: 0.85rem;
+  color: var(--text);
+  vertical-align: middle;
+}
+.res-table__td--rank {
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+.res-table__td--metric {
+  text-align: right;
+}
+.res-table__td--best {
+  background: rgba(74, 222, 128, 0.04);
+}
+.res-table__td--best .res-val {
+  color: var(--green);
+  font-weight: 700;
+}
+.res-table__td--runs {
+  text-align: center;
+}
+
+/* ── Results: Library Cell ──────────────────────────────────────────────── */
+.res-lib {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  color: inherit;
+}
+.res-lib__name {
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: var(--text);
+  transition: color var(--transition);
+}
+.res-lib:hover .res-lib__name {
+  color: var(--accent);
+}
+.res-lib__eco {
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  padding: 0.1rem 0.45rem;
+  border-radius: 100px;
+  background: var(--bg);
+  white-space: nowrap;
+}
+
+/* ── Results: Metric Values ─────────────────────────────────────────────── */
+.res-val {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+.res-unit {
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-left: 0.15rem;
+}
+.res-range {
+  display: block;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin-top: 0.1rem;
+}
+.res-nodata {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+/* ── Results: Runs & Confidence ─────────────────────────────────────────── */
+.res-runs__count {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-right: 0.3rem;
+}
+.res-runs__badge {
+  font-size: 0.7rem;
+}
+
+/* ── Results: Empty State ───────────────────────────────────────────────── */
+.res-empty {
+  padding: 3rem 1.5rem;
+  text-align: center;
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  margin-top: 1rem;
+}
+.res-empty__text {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+/* ── Results: Legend ─────────────────────────────────────────────────────── */
+.res-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  padding: 0 0.25rem;
+}
+.res-legend__item {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ── Results: Footer ────────────────────────────────────────────────────── */
+.res-footer {
+  margin-top: 0.5rem;
+  padding: 0 0.25rem;
+}
+.res-footer__note {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* ── Results: Responsive ────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .res-table__th--metric,
+  .res-table__td--metric {
+    min-width: 80px;
+    padding: 0.5rem 0.6rem;
+  }
+  .res-lib__eco {
+    display: none;
+  }
+}
+@media (max-width: 640px) {
+  .res-table__th,
+  .res-table__td {
+    padding: 0.5rem 0.5rem;
+    font-size: 0.78rem;
+  }
+  .res-val {
+    font-size: 0.82rem;
+  }
+  .res-range {
+    display: none;
+  }
+  .res-table__th--rank,
+  .res-table__td--rank {
+    display: none;
   }
 }
 `.trim();

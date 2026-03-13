@@ -53,9 +53,7 @@ export function resetDb(): void {
 function getDb(): Database {
   if (!db) {
     if (!existsSync(dbPath)) {
-      throw new Error(
-        "benchmarks.db not found. Run: bun run seed:db",
-      );
+      throw new Error("benchmarks.db not found. Run: bun run seed:db");
     }
     db = new Database(dbPath);
     db.run("PRAGMA journal_mode = WAL");
@@ -97,7 +95,7 @@ interface BenchmarkResultInput {
   screenHeight?: number;
 }
 
-interface AggregatedMetric {
+export interface AggregatedMetric {
   label: string;
   unit: string;
   better: "lower" | "higher";
@@ -111,7 +109,7 @@ interface AggregatedMetric {
   sampleCount: number;
 }
 
-interface StatsResult {
+export interface StatsResult {
   librarySlug: string;
   itemCount: number;
   totalRuns: number;
@@ -154,7 +152,9 @@ const MAX_UNIT_LENGTH = 32;
 const MAX_ERROR_LENGTH = 1024;
 const MAX_META_LENGTH = 256;
 const MAX_METRICS_PER_RESULT = 100;
-const VALID_ITEM_COUNTS = new Set([1_000, 5_000, 10_000, 50_000, 100_000, 500_000, 1_000_000]);
+const VALID_ITEM_COUNTS = new Set([
+  1_000, 5_000, 10_000, 50_000, 100_000, 500_000, 1_000_000,
+]);
 const VALID_BETTER = new Set(["lower", "higher"]);
 const VALID_RATING = new Set(["good", "ok", "bad"]);
 
@@ -195,7 +195,9 @@ setInterval(() => {
 
 function validateResult(
   data: unknown,
-): { valid: true; result: BenchmarkResultInput } | { valid: false; error: string } {
+):
+  | { valid: true; result: BenchmarkResultInput }
+  | { valid: false; error: string } {
   if (!data || typeof data !== "object") {
     return { valid: false, error: "Request body must be a JSON object" };
   }
@@ -204,13 +206,23 @@ function validateResult(
 
   // librarySlug — required
   if (typeof d.librarySlug !== "string" || d.librarySlug.length === 0) {
-    return { valid: false, error: "librarySlug is required and must be a non-empty string" };
+    return {
+      valid: false,
+      error: "librarySlug is required and must be a non-empty string",
+    };
   }
   if (d.librarySlug.length > MAX_SLUG_LENGTH) {
-    return { valid: false, error: `librarySlug exceeds max length (${MAX_SLUG_LENGTH})` };
+    return {
+      valid: false,
+      error: `librarySlug exceeds max length (${MAX_SLUG_LENGTH})`,
+    };
   }
   if (!/^[a-z0-9-]+$/.test(d.librarySlug)) {
-    return { valid: false, error: "librarySlug must contain only lowercase letters, digits, and hyphens" };
+    return {
+      valid: false,
+      error:
+        "librarySlug must contain only lowercase letters, digits, and hyphens",
+    };
   }
 
   // libraryVersion — optional
@@ -219,7 +231,10 @@ function validateResult(
       return { valid: false, error: "libraryVersion must be a string" };
     }
     if (d.libraryVersion.length > MAX_VERSION_LENGTH) {
-      return { valid: false, error: `libraryVersion exceeds max length (${MAX_VERSION_LENGTH})` };
+      return {
+        valid: false,
+        error: `libraryVersion exceeds max length (${MAX_VERSION_LENGTH})`,
+      };
     }
   }
 
@@ -242,7 +257,10 @@ function validateResult(
     return { valid: false, error: "metrics array must not be empty" };
   }
   if (d.metrics.length > MAX_METRICS_PER_RESULT) {
-    return { valid: false, error: `metrics array exceeds max length (${MAX_METRICS_PER_RESULT})` };
+    return {
+      valid: false,
+      error: `metrics array exceeds max length (${MAX_METRICS_PER_RESULT})`,
+    };
   }
 
   // Validate each metric
@@ -261,7 +279,10 @@ function validateResult(
     }
 
     if (typeof metric.value !== "number" || !Number.isFinite(metric.value)) {
-      return { valid: false, error: `metrics[${i}].value must be a finite number` };
+      return {
+        valid: false,
+        error: `metrics[${i}].value must be a finite number`,
+      };
     }
 
     if (typeof metric.unit !== "string" || metric.unit.length === 0) {
@@ -272,12 +293,18 @@ function validateResult(
     }
 
     if (!VALID_BETTER.has(metric.better as string)) {
-      return { valid: false, error: `metrics[${i}].better must be "lower" or "higher"` };
+      return {
+        valid: false,
+        error: `metrics[${i}].better must be "lower" or "higher"`,
+      };
     }
 
     if (metric.rating !== undefined && metric.rating !== null) {
       if (!VALID_RATING.has(metric.rating as string)) {
-        return { valid: false, error: `metrics[${i}].rating must be "good", "ok", or "bad"` };
+        return {
+          valid: false,
+          error: `metrics[${i}].rating must be "good", "ok", or "bad"`,
+        };
       }
     }
 
@@ -292,8 +319,15 @@ function validateResult(
   }
 
   // duration — required
-  if (typeof d.duration !== "number" || !Number.isFinite(d.duration) || d.duration < 0) {
-    return { valid: false, error: "duration must be a non-negative finite number" };
+  if (
+    typeof d.duration !== "number" ||
+    !Number.isFinite(d.duration) ||
+    d.duration < 0
+  ) {
+    return {
+      valid: false,
+      error: "duration must be a non-negative finite number",
+    };
   }
 
   // success — required
@@ -307,21 +341,38 @@ function validateResult(
       return { valid: false, error: "error must be a string" };
     }
     if (d.error.length > MAX_ERROR_LENGTH) {
-      return { valid: false, error: `error exceeds max length (${MAX_ERROR_LENGTH})` };
+      return {
+        valid: false,
+        error: `error exceeds max length (${MAX_ERROR_LENGTH})`,
+      };
     }
   }
 
   // stressMs — optional
   if (d.stressMs !== undefined && d.stressMs !== null) {
-    if (typeof d.stressMs !== "number" || !Number.isFinite(d.stressMs) || d.stressMs < 0) {
-      return { valid: false, error: "stressMs must be a non-negative finite number" };
+    if (
+      typeof d.stressMs !== "number" ||
+      !Number.isFinite(d.stressMs) ||
+      d.stressMs < 0
+    ) {
+      return {
+        valid: false,
+        error: "stressMs must be a non-negative finite number",
+      };
     }
   }
 
   // scrollSpeed — optional
   if (d.scrollSpeed !== undefined && d.scrollSpeed !== null) {
-    if (typeof d.scrollSpeed !== "number" || !Number.isFinite(d.scrollSpeed) || d.scrollSpeed < 0) {
-      return { valid: false, error: "scrollSpeed must be a non-negative finite number" };
+    if (
+      typeof d.scrollSpeed !== "number" ||
+      !Number.isFinite(d.scrollSpeed) ||
+      d.scrollSpeed < 0
+    ) {
+      return {
+        valid: false,
+        error: "scrollSpeed must be a non-negative finite number",
+      };
     }
   }
 
@@ -331,20 +382,32 @@ function validateResult(
       return { valid: false, error: "userAgent must be a string" };
     }
     if (d.userAgent.length > MAX_USER_AGENT_LENGTH) {
-      return { valid: false, error: `userAgent exceeds max length (${MAX_USER_AGENT_LENGTH})` };
+      return {
+        valid: false,
+        error: `userAgent exceeds max length (${MAX_USER_AGENT_LENGTH})`,
+      };
     }
   }
 
   // hardwareConcurrency — optional
   if (d.hardwareConcurrency !== undefined && d.hardwareConcurrency !== null) {
-    if (typeof d.hardwareConcurrency !== "number" || !Number.isFinite(d.hardwareConcurrency)) {
-      return { valid: false, error: "hardwareConcurrency must be a finite number" };
+    if (
+      typeof d.hardwareConcurrency !== "number" ||
+      !Number.isFinite(d.hardwareConcurrency)
+    ) {
+      return {
+        valid: false,
+        error: "hardwareConcurrency must be a finite number",
+      };
     }
   }
 
   // deviceMemory — optional
   if (d.deviceMemory !== undefined && d.deviceMemory !== null) {
-    if (typeof d.deviceMemory !== "number" || !Number.isFinite(d.deviceMemory)) {
+    if (
+      typeof d.deviceMemory !== "number" ||
+      !Number.isFinite(d.deviceMemory)
+    ) {
       return { valid: false, error: "deviceMemory must be a finite number" };
     }
   }
@@ -358,7 +421,10 @@ function validateResult(
 
   // screenHeight — optional
   if (d.screenHeight !== undefined && d.screenHeight !== null) {
-    if (typeof d.screenHeight !== "number" || !Number.isFinite(d.screenHeight)) {
+    if (
+      typeof d.screenHeight !== "number" ||
+      !Number.isFinite(d.screenHeight)
+    ) {
       return { valid: false, error: "screenHeight must be a finite number" };
     }
   }
@@ -384,18 +450,22 @@ function validateResult(
       stressMs: (d.stressMs as number) ?? 0,
       scrollSpeed: (d.scrollSpeed as number) ?? 0,
       userAgent: (d.userAgent as string) || undefined,
-      hardwareConcurrency: typeof d.hardwareConcurrency === "number"
-        ? Math.min(Math.round(d.hardwareConcurrency), 256)
-        : undefined,
-      deviceMemory: typeof d.deviceMemory === "number"
-        ? Math.min(d.deviceMemory, 1024)
-        : undefined,
-      screenWidth: typeof d.screenWidth === "number"
-        ? Math.min(Math.round(d.screenWidth), 16384)
-        : undefined,
-      screenHeight: typeof d.screenHeight === "number"
-        ? Math.min(Math.round(d.screenHeight), 16384)
-        : undefined,
+      hardwareConcurrency:
+        typeof d.hardwareConcurrency === "number"
+          ? Math.min(Math.round(d.hardwareConcurrency), 256)
+          : undefined,
+      deviceMemory:
+        typeof d.deviceMemory === "number"
+          ? Math.min(d.deviceMemory, 1024)
+          : undefined,
+      screenWidth:
+        typeof d.screenWidth === "number"
+          ? Math.min(Math.round(d.screenWidth), 16384)
+          : undefined,
+      screenHeight:
+        typeof d.screenHeight === "number"
+          ? Math.min(Math.round(d.screenHeight), 16384)
+          : undefined,
     },
   };
 }
@@ -404,9 +474,7 @@ function validateResult(
 // Storage
 // =============================================================================
 
-function storeResult(
-  result: BenchmarkResultInput,
-): { runId: number } {
+function storeResult(result: BenchmarkResultInput): { runId: number } {
   const database = getDb();
 
   const insertRun = database.prepare(`
@@ -466,7 +534,7 @@ function storeResult(
 // Query: Stats (aggregated metrics for a library)
 // =============================================================================
 
-function getStats(options: {
+export function getStats(options: {
   librarySlug?: string;
   libraryVersion?: string;
   itemCount?: number;
@@ -504,9 +572,8 @@ function getStats(options: {
     params.push(options.scrollSpeed);
   }
 
-  const where = conditions.length > 0
-    ? `WHERE ${conditions.join(" AND ")}`
-    : "";
+  const where =
+    conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
   const limit = options.limit ?? 100;
 
@@ -525,11 +592,11 @@ function getStats(options: {
       LIMIT ?`,
     )
     .all(...params, limit) as {
-      library_slug: string;
-      library_version: string | null;
-      item_count: number;
-      total_runs: number;
-    }[];
+    library_slug: string;
+    library_version: string | null;
+    item_count: number;
+    total_runs: number;
+  }[];
 
   const results: StatsResult[] = [];
 
@@ -573,11 +640,11 @@ function getStats(options: {
          ORDER BY m.label`,
       )
       .all(...metricParams) as {
-        label: string;
-        value: number;
-        unit: string;
-        better: string;
-      }[];
+      label: string;
+      value: number;
+      unit: string;
+      better: string;
+    }[];
 
     // Group by label and compute aggregates
     const byLabel = new Map<
@@ -602,8 +669,7 @@ function getStats(options: {
 
       const sum = values.reduce((a, b) => a + b, 0);
       const mean = sum / n;
-      const variance =
-        values.reduce((acc, v) => acc + (v - mean) ** 2, 0) / n;
+      const variance = values.reduce((acc, v) => acc + (v - mean) ** 2, 0) / n;
 
       metrics.push({
         label,
@@ -693,16 +759,13 @@ function getHistory(options: {
       ORDER BY day`,
     )
     .all(...params) as {
-      day: string;
-      library_version: string | null;
-      value: number;
-    }[];
+    day: string;
+    library_version: string | null;
+    value: number;
+  }[];
 
   // Group by day + version, compute daily aggregates
-  const groups = new Map<
-    string,
-    { version: string; values: number[] }
-  >();
+  const groups = new Map<string, { version: string; values: number[] }>();
 
   for (const row of rows) {
     const key = `${row.day}::${row.library_version ?? "unknown"}`;
@@ -755,11 +818,11 @@ function getLibraries(): LibraryVersionInfo[] {
       ORDER BY total_runs DESC`,
     )
     .all() as {
-      library_slug: string;
-      library_version: string | null;
-      total_runs: number;
-      last_seen: string;
-    }[];
+    library_slug: string;
+    library_version: string | null;
+    total_runs: number;
+    last_seen: string;
+  }[];
 
   return rows.map((row) => ({
     librarySlug: row.library_slug,
@@ -789,10 +852,10 @@ function getBrowsers(): BrowserInfo[] {
       LIMIT 100`,
     )
     .all() as {
-      user_agent: string;
-      total_runs: number;
-      last_seen: string;
-    }[];
+    user_agent: string;
+    total_runs: number;
+    last_seen: string;
+  }[];
 
   // Deduplicate by parsed browser name
   const browsers = new Map<string, BrowserInfo>();
@@ -820,7 +883,7 @@ function getBrowsers(): BrowserInfo[] {
 // Query: Summary (high-level overview)
 // =============================================================================
 
-function getSummary(): Record<string, unknown> {
+export function getSummary(): Record<string, unknown> {
   const database = getDb();
 
   const counts = database

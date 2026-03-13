@@ -1,6 +1,7 @@
 <aside class="sidebar">
-  <a href="/benchmarks" class="sidebar__link<%= !it.activeSlug && it.activeSlug !== 'compare' ? ' sidebar__link--active' : '' %>"><%= it.t("sidebar.overview_link") %></a>
+  <a href="/benchmarks" class="sidebar__link<%= !it.activeSlug && it.activeSlug !== 'compare' && it.activeSlug !== 'results' ? ' sidebar__link--active' : '' %>"><%= it.t("sidebar.overview_link") %></a>
   <a href="/benchmarks/compare" class="sidebar__link<%= it.activeSlug === 'compare' ? ' sidebar__link--active' : '' %>"><%= it.t("sidebar.compare_link") %></a>
+  <a href="/benchmarks/results" class="sidebar__link<%= it.activeSlug === 'results' ? ' sidebar__link--active' : '' %>"><%= it.t("sidebar.results_link") %></a>
   <% it.ecosystems.forEach(function(group) { %>
   <div class="sidebar__group">
     <div class="sidebar__group-label"><%= group.label %></div>

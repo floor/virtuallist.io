@@ -5,7 +5,9 @@
     "library_title": "{name} Benchmark — virtuallist.io",
     "library_description": "Live performance benchmark for {name}. Measure render time, memory usage, scroll FPS, and P95 frame time with {npm} in your browser.",
     "compare_title": "Compare Libraries — virtuallist.io",
-    "compare_description": "Compare virtual list libraries head-to-head in your browser. Run any combination of React, Vue, SolidJS, Svelte, and Vanilla JS implementations under identical test conditions."
+    "compare_description": "Compare virtual list libraries head-to-head in your browser. Run any combination of React, Vue, SolidJS, Svelte, and Vanilla JS implementations under identical test conditions.",
+    "results_title": "Crowdsourced Results — virtuallist.io",
+    "results_description": "Aggregated benchmark results from real users across devices and browsers. See how virtual list libraries compare based on crowdsourced data — render time, memory, scroll FPS, and P95 frame time."
   },
   "overview": {
     "title": "Benchmarks",
@@ -16,7 +18,29 @@
   },
   "sidebar": {
     "overview_link": "Overview",
-    "compare_link": "⚖ Compare"
+    "compare_link": "⚖ Compare",
+    "results_link": "📊 Results"
+  },
+  "results": {
+    "title": "Crowdsourced Results",
+    "desc": "Aggregated benchmark data from real users across different hardware, browsers, and conditions. Every run contributes to the dataset — no single machine bias.",
+    "empty": "No benchmark data yet. Run some benchmarks to start building the dataset!",
+    "empty_filter": "No data for this combination of items and stress level.",
+    "table_library": "Library",
+    "table_ecosystem": "Ecosystem",
+    "table_render": "Render",
+    "table_memory": "Memory",
+    "table_fps": "Scroll FPS",
+    "table_p95": "P95 Frame",
+    "table_runs": "Runs",
+    "confidence_high": "High confidence",
+    "confidence_moderate": "Moderate confidence",
+    "confidence_low": "Low confidence",
+    "best_label": "Best",
+    "range_label": "p5–p95 range",
+    "no_data": "—",
+    "footer_note": "Medians from crowdsourced runs. Actual performance depends on your hardware, browser, and system load.",
+    "last_updated": "Based on {runs} total benchmark runs"
   },
   "controls": {
     "items_label": "Items",

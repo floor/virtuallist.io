@@ -99,6 +99,13 @@ WAL mode is particularly useful here because the API serves many concurrent read
 - **No pooling** — a single connection is shared. SQLite with WAL handles concurrent read access without pooling.
 - **Test isolation** — `setDbPath(path)` closes the existing connection and points to a different file. `resetDb()` does the same and restores the default path. These are exported for use in tests.
 
+### Server-side consumers
+
+The database is accessed in two ways:
+
+1. **API routes** (`/api/benchmarks/*`) — HTTP endpoints that accept or return JSON. Used by the browser benchmark engine to POST results, and available for external consumers via GET.
+2. **Page renderers** — the results page (`/benchmarks/results`) calls `getStats()` and `getSummary()` directly during server-side HTML assembly, with no HTTP round-trip. This is possible because `getStats()` and `getSummary()` are exported from `src/api/benchmarks.ts` and imported by `src/server/pages/benchmarks.ts`. Both code paths share the same singleton `Database` connection.
+
 ---
 
 ## Seed Script (`scripts/seed-db.ts`)

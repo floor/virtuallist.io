@@ -34,6 +34,7 @@ virtuallist.io/
 │   ├── runner.js                 # Core measurement engine (browser, ESM)
 │   ├── script.js                 # Browser entry point — wires UI and runner
 │   ├── compare.js                # Compare page entry point — multi-library head-to-head
+│   ├── results.js                # Results page entry point — filter controls + column sorting
 │   ├── build.ts                  # Bun bundler build script
 │   └── libraries/
 │       ├── _TEMPLATE.js          # Template for new adapters
@@ -63,6 +64,7 @@ virtuallist.io/
 │       ├── runner.js
 │       ├── script.js             # ~1.5 MB minified (all adapters + frameworks)
 │       ├── compare.js            # ~1.5 MB minified (same adapters, compare UI)
+│       ├── results.js            # ~2 KB minified (filter navigation + column sorting)
 │       └── styles.css            # vlist.css + any local overrides, minified
 │
 ├── test/                         # Bun test files
@@ -102,6 +104,7 @@ handleRequest(req)
   │
   ├── resolveBenchmarks()     →  /benchmarks
   │                              /benchmarks/compare
+  │                              /benchmarks/results
   │                              /benchmarks/{slug}
   │
   ├── resolveMethodology()    →  /methodology
@@ -130,6 +133,7 @@ Each resolver returns a `Response` or `null`. The first non-null response wins. 
 | `/` | Homepage | none |
 | `/benchmarks` | Benchmark overview | none |
 | `/benchmarks/compare` | Multi-library head-to-head comparison | `compare.js` |
+| `/benchmarks/results` | Crowdsourced aggregated results | `results.js` |
 | `/benchmarks/{slug}` | Individual library benchmark | `script.js` |
 | `/methodology` | Methodology documentation | none |
 | `/about` | About | none |
@@ -152,6 +156,8 @@ The project has two completely separate JS environments that never share code at
 
 The only connection between them is the `/api/benchmarks` HTTP endpoint: the browser engine POSTs results there, and the server stores them.
 
+There is one exception to the strict server/browser separation: `results.js` is a lightweight client-side script (~2 KB) that handles filter navigation and column sorting on the `/benchmarks/results` page. It does not import any benchmark adapters or frameworks — it only manipulates the server-rendered DOM.
+
 The about section pages (`/about`, `/about/api`, `/about/contribute`) are purely server-rendered and ship zero JavaScript.
 
 ---
@@ -169,7 +175,7 @@ renderSomePage()
 
 `renderShell()` provides the consistent outer document: `<head>` with meta tags and critical CSS, sticky navigation header, `<main>` with the content, and footer.
 
-Only benchmark pages load JavaScript. The `<script type="module" src="/dist/benchmarks/script.js">` tag is injected via `extraBody` on `/benchmarks/{slug}` pages. The compare page at `/benchmarks/compare` loads `compare.js` instead. Every other page — homepage, overview, methodology, about — ships zero JavaScript.
+Only benchmark pages load JavaScript. The `<script type="module" src="/dist/benchmarks/script.js">` tag is injected via `extraBody` on `/benchmarks/{slug}` pages. The compare page at `/benchmarks/compare` loads `compare.js` instead. The results page at `/benchmarks/results` loads `results.js` (a lightweight ~2 KB script for filter controls and column sorting). Every other page — homepage, overview, methodology, about — ships zero JavaScript.
 
 ---
 
@@ -228,6 +234,8 @@ GET /api/benchmarks/history?librarySlug=react-window&metric=Render
   → getHistory()               groups by day + version, daily aggregates
   → returns HistoryPoint[]     for time-series charts
 ```
+
+The results page (`/benchmarks/results`) also consumes this data, but server-side: `assembleResultsPage()` calls `getStats()` and `getSummary()` directly (no HTTP round-trip) and renders the aggregated data into an HTML leaderboard table. This is the primary way visitors see crowdsourced results without running benchmarks themselves.
 
 ---
 
