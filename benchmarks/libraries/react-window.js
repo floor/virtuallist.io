@@ -5,6 +5,10 @@
 //
 // react-window provides FixedSizeList and VariableSizeList components
 // for windowed rendering in React applications.
+//
+// Implementation notes:
+//   - Dependencies are loaded eagerly at module init time (not inside create())
+//     to avoid measuring import() overhead during the timed render phase.
 
 import {
   defineLibrary,
@@ -13,66 +17,36 @@ import {
   createRealisticReactChildren,
 } from "../runner.js";
 
-// =============================================================================
-// Lazy-loaded dependencies
-// =============================================================================
+let React = null, ReactDOM = null, FixedSizeList = null, loadError = null;
 
-let React;
-let ReactDOM;
-let FixedSizeList;
-
-/**
- * Lazy load React and react-window.
- * Returns false if loading fails (libraries not available).
- */
-const loadDependencies = async () => {
+const depsReady = (async () => {
   try {
-    if (!React) {
-      React = await import("react");
-
-      const ReactDOMClient = await import("react-dom/client");
-      // Bun's bundler double-wraps CJS modules via __toESM. On some browsers
-      // (Firefox) the getter-based proxy loses `createRoot`. Fall back to
-      // `.default` which holds the original CJS exports object.
-      ReactDOM = ReactDOMClient.createRoot
-        ? ReactDOMClient
-        : (ReactDOMClient.default ?? ReactDOMClient);
-
-      const reactWindow = await import("react-window");
-      FixedSizeList = reactWindow.FixedSizeList;
-    }
-    return true;
+    React = await import("react");
+    const ReactDOMClient = await import("react-dom/client");
+    ReactDOM = ReactDOMClient.createRoot
+      ? ReactDOMClient
+      : (ReactDOMClient.default ?? ReactDOMClient);
+    const reactWindow = await import("react-window");
+    FixedSizeList = reactWindow.FixedSizeList;
   } catch (err) {
+    loadError = err;
     console.error("[react-window] Failed to load dependencies:", err);
-    return false;
   }
-};
+})();
 
-// =============================================================================
-// Row Component
-// =============================================================================
-
-/**
- * Build a Row component that renders the shared realistic template.
- * Created lazily after React is loaded.
- */
+// Row component — built lazily once React is loaded, stable reference for re-renders.
 let Row;
 const getRow = () => {
   if (!Row) {
-    Row = ({ index, style }) => {
-      return React.createElement(
+    Row = ({ index, style }) =>
+      React.createElement(
         "div",
         { className: "bench-item", style },
         ...createRealisticReactChildren(React, index),
       );
-    };
   }
   return Row;
 };
-
-// =============================================================================
-// Adapter Registration
-// =============================================================================
 
 defineLibrary({
   slug: "react-window",
@@ -87,12 +61,10 @@ defineLibrary({
    * @returns {Promise<*>} React root instance (for later unmounting)
    */
   create: async (container, itemCount) => {
-    const loaded = await loadDependencies();
-    if (!loaded) {
-      throw new Error("react-window is not available — failed to load dependencies");
+    await depsReady;
+    if (!FixedSizeList) {
+      throw new Error("react-window is not available — failed to load dependencies" + (loadError ? `: ${loadError.message}` : ""));
     }
-
-    const RowComponent = getRow();
 
     const listComponent = React.createElement(FixedSizeList, {
       height: container.clientHeight || 600,
@@ -100,7 +72,7 @@ defineLibrary({
       itemSize: ITEM_HEIGHT,
       overscanCount: DEFAULT_OVERSCAN,
       width: "100%",
-      children: RowComponent,
+      children: getRow(),
     });
 
     const root = ReactDOM.createRoot(container);
@@ -108,11 +80,6 @@ defineLibrary({
     return root;
   },
 
-  /**
-   * Unmount a react-window instance.
-   *
-   * @param {*} root - React root returned by create()
-   */
   destroy: async (root) => {
     if (root && typeof root.unmount === "function") {
       root.unmount();

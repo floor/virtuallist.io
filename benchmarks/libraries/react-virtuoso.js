@@ -5,6 +5,10 @@
 //
 // react-virtuoso provides a feature-rich React virtualization component
 // with auto-height measurement, grouped lists, reverse mode, and table support.
+//
+// Implementation notes:
+//   - Dependencies are loaded eagerly at module init time (not inside create())
+//     to avoid measuring import() overhead during the timed render phase.
 
 import {
   defineLibrary,
@@ -13,41 +17,22 @@ import {
   createRealisticReactChildren,
 } from "../runner.js";
 
-// =============================================================================
-// Lazy-loaded dependencies
-// =============================================================================
+let React = null, ReactDOM = null, Virtuoso = null, loadError = null;
 
-let React;
-let ReactDOM;
-let Virtuoso;
-
-/**
- * Lazy load React and react-virtuoso.
- * Returns false if loading fails.
- */
-const loadDependencies = async () => {
+const depsReady = (async () => {
   try {
-    if (!React) {
-      React = await import("react");
-
-      const ReactDOMClient = await import("react-dom/client");
-      ReactDOM = ReactDOMClient.createRoot
-        ? ReactDOMClient
-        : (ReactDOMClient.default ?? ReactDOMClient);
-
-      const virtuosoMod = await import("react-virtuoso");
-      Virtuoso = virtuosoMod.Virtuoso;
-    }
-    return true;
+    React = await import("react");
+    const ReactDOMClient = await import("react-dom/client");
+    ReactDOM = ReactDOMClient.createRoot
+      ? ReactDOMClient
+      : (ReactDOMClient.default ?? ReactDOMClient);
+    const virtuosoMod = await import("react-virtuoso");
+    Virtuoso = virtuosoMod.Virtuoso;
   } catch (err) {
+    loadError = err;
     console.error("[react-virtuoso] Failed to load dependencies:", err);
-    return false;
   }
-};
-
-// =============================================================================
-// Adapter Registration
-// =============================================================================
+})();
 
 defineLibrary({
   slug: "react-virtuoso",
@@ -62,26 +47,22 @@ defineLibrary({
    * @returns {Promise<*>} React root instance
    */
   create: async (container, itemCount) => {
-    const loaded = await loadDependencies();
-    if (!loaded) {
-      throw new Error("react-virtuoso is not available — failed to load dependencies");
+    await depsReady;
+    if (!Virtuoso) {
+      throw new Error("react-virtuoso is not available — failed to load dependencies" + (loadError ? `: ${loadError.message}` : ""));
     }
 
     const listComponent = React.createElement(Virtuoso, {
       totalCount: itemCount,
       fixedItemHeight: ITEM_HEIGHT,
       overscan: DEFAULT_OVERSCAN * ITEM_HEIGHT,
-      style: {
-        height: `${container.clientHeight || 600}px`,
-        width: "100%",
-      },
-      itemContent: (index) => {
-        return React.createElement(
+      style: { height: `${container.clientHeight || 600}px`, width: "100%" },
+      itemContent: (index) =>
+        React.createElement(
           "div",
           { className: "bench-item", style: { height: `${ITEM_HEIGHT}px` } },
           ...createRealisticReactChildren(React, index),
-        );
-      },
+        ),
     });
 
     const root = ReactDOM.createRoot(container);
@@ -89,11 +70,6 @@ defineLibrary({
     return root;
   },
 
-  /**
-   * Unmount a react-virtuoso instance.
-   *
-   * @param {*} root - React root returned by create()
-   */
   destroy: async (root) => {
     if (root && typeof root.unmount === "function") {
       root.unmount();

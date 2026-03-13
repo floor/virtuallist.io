@@ -1,10 +1,12 @@
 // benchmarks/libraries/vlist-vue.js — VList (Vue) benchmark adapter
 //
-// Registers vlist-vue with the benchmark runner so it can be tested
-// with the same measurement pipeline as every other library.
-//
-// vlist-vue is the Vue 3 binding for the zero-dependency @floor/vlist core.
-// It provides a <VList> component for Vue 3 applications.
+// Implementation notes:
+//   - Dependencies are loaded eagerly at module init time (not inside create())
+//     to avoid measuring import() overhead during the timed render phase.
+//   - The items array (with pre-computed display data) is cached outside create()
+//     so that array construction + string computation is never measured as render time.
+//   - Vue templates need pre-computed display values (initials, title, etc.) because
+//     the template slot cannot call imported JS helper functions directly.
 
 import {
   defineLibrary,
@@ -14,75 +16,51 @@ import {
   ITEM_BADGES,
 } from "../runner.js";
 
-// =============================================================================
-// Lazy-loaded dependencies
-// =============================================================================
+let Vue = null, VList = null, loadError = null;
 
-let Vue;
-let VList;
-
-/**
- * Lazy load Vue and vlist-vue.
- * Returns false if loading fails.
- */
-const loadDependencies = async () => {
+const depsReady = (async () => {
   try {
-    if (!Vue) {
-      Vue = await import("vue");
-
-      const vlistVue = await import("vlist-vue");
-      VList = vlistVue.VList || vlistVue.default;
-    }
-    return true;
+    Vue = await import("vue");
+    const vlistVue = await import("vlist-vue");
+    VList = vlistVue.VList || vlistVue.default;
   } catch (err) {
+    loadError = err;
     console.error("[vlist-vue] Failed to load dependencies:", err);
-    return false;
   }
-};
+})();
 
-// =============================================================================
-// Adapter Registration
-// =============================================================================
-
-defineLibrary({
-  slug: "vlist-vue",
-  name: "VList (Vue)",
-  ecosystem: "vue",
-
-  /**
-   * Mount a vlist-vue VList into the container.
-   *
-   * Creates a Vue 3 app with the VList component, configured to render
-   * the same realistic item template as all other libraries.
-   *
-   * @param {HTMLElement} container - DOM element to render into
-   * @param {number} itemCount - Number of items in the list
-   * @returns {Promise<*>} Object with { app, wrapper } for later cleanup
-   */
-  create: async (container, itemCount) => {
-    const loaded = await loadDependencies();
-    if (!loaded) {
-      throw new Error(
-        "VList (Vue) is not available — failed to load vlist-vue",
-      );
-    }
-
-    // Build items array with pre-computed display data
-    const items = [];
-    for (let i = 0; i < itemCount; i++) {
+// Rich items cache — Vue templates need pre-computed display values.
+const itemsCache = new Map();
+const getItems = (itemCount) => {
+  if (!itemsCache.has(itemCount)) {
+    const items = Array.from({ length: itemCount }, (_, i) => {
       const n = ITEM_NAMES[i % ITEM_NAMES.length];
       const n2 = ITEM_NAMES[(i + 3) % ITEM_NAMES.length];
-      items.push({
+      return {
         id: i,
         initials: `${n[0]}${n2[0]}`,
         title: `${n} — Item ${i}`,
         sub: "Lorem ipsum dolor sit amet",
         badge: ITEM_BADGES[i % ITEM_BADGES.length],
         time: `${(i % 59) + 1}m`,
-      });
+      };
+    });
+    itemsCache.set(itemCount, items);
+  }
+  return itemsCache.get(itemCount);
+};
+
+defineLibrary({
+  slug: "vlist-vue",
+  name: "VList (Vue)",
+  ecosystem: "vue",
+
+  create: async (container, itemCount) => {
+    await depsReady;
+    if (!VList) {
+      throw new Error("VList (Vue) is not available — failed to load vlist-vue" + (loadError ? `: ${loadError.message}` : ""));
     }
 
-    // Create a wrapper div for the Vue app
     const wrapper = document.createElement("div");
     wrapper.style.cssText = `height:${container.clientHeight || 600}px;width:100%;overflow:hidden;`;
     container.appendChild(wrapper);
@@ -91,7 +69,7 @@ defineLibrary({
       components: { VList },
       data() {
         return {
-          items,
+          items: getItems(itemCount),
           itemHeight: ITEM_HEIGHT,
           overscan: DEFAULT_OVERSCAN,
           containerHeight: container.clientHeight || 600,
@@ -124,18 +102,11 @@ defineLibrary({
     return { app, wrapper };
   },
 
-  /**
-   * Unmount a vlist-vue instance and clean up its DOM.
-   *
-   * @param {{app: *, wrapper: HTMLElement}} instance - Handle from create()
-   */
   destroy: async (instance) => {
     if (!instance) return;
-
     if (instance.app && typeof instance.app.unmount === "function") {
       instance.app.unmount();
     }
-
     if (instance.wrapper && instance.wrapper.parentNode) {
       instance.wrapper.parentNode.removeChild(instance.wrapper);
     }

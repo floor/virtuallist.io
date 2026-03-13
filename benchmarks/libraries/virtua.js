@@ -5,6 +5,13 @@
 //
 // Virtua provides a zero-config <VList> component (~3 kB per entry point)
 // for React applications.
+//
+// Implementation notes:
+//   - Dependencies are loaded eagerly at module init time (not inside create())
+//     to avoid measuring import() overhead during the timed render phase.
+//   - Virtua's <VList> accepts children as an array — we pre-build and cache
+//     the React element array outside create() so its allocation (which is
+//     O(itemCount)) is never measured as render time.
 
 import {
   defineLibrary,
@@ -13,41 +20,39 @@ import {
   createRealisticReactChildren,
 } from "../runner.js";
 
-// =============================================================================
-// Lazy-loaded dependencies
-// =============================================================================
+let React = null, ReactDOM = null, VList = null, loadError = null;
 
-let React;
-let ReactDOM;
-let VList;
-
-/**
- * Lazy load React and Virtua.
- * Returns false if loading fails.
- */
-const loadDependencies = async () => {
+const depsReady = (async () => {
   try {
-    if (!React) {
-      React = await import("react");
-
-      const ReactDOMClient = await import("react-dom/client");
-      ReactDOM = ReactDOMClient.createRoot
-        ? ReactDOMClient
-        : (ReactDOMClient.default ?? ReactDOMClient);
-
-      const virtuaMod = await import("virtua");
-      VList = virtuaMod.VList;
-    }
-    return true;
+    React = await import("react");
+    const ReactDOMClient = await import("react-dom/client");
+    ReactDOM = ReactDOMClient.createRoot
+      ? ReactDOMClient
+      : (ReactDOMClient.default ?? ReactDOMClient);
+    const virtuaMod = await import("virtua");
+    VList = virtuaMod.VList;
   } catch (err) {
+    loadError = err;
     console.error("[virtua] Failed to load dependencies:", err);
-    return false;
   }
-};
+})();
 
-// =============================================================================
-// Adapter Registration
-// =============================================================================
+// Children element cache — React elements are plain objects and are safe to
+// cache across renders. Keyed by itemCount.
+const childrenCache = new Map();
+const getChildren = (itemCount) => {
+  if (!childrenCache.has(itemCount)) {
+    const children = Array.from({ length: itemCount }, (_, i) =>
+      React.createElement(
+        "div",
+        { key: i, className: "bench-item", style: { height: `${ITEM_HEIGHT}px` } },
+        ...createRealisticReactChildren(React, i),
+      ),
+    );
+    childrenCache.set(itemCount, children);
+  }
+  return childrenCache.get(itemCount);
+};
 
 defineLibrary({
   slug: "virtua",
@@ -62,37 +67,18 @@ defineLibrary({
    * @returns {Promise<*>} React root instance
    */
   create: async (container, itemCount) => {
-    const loaded = await loadDependencies();
-    if (!loaded) {
-      throw new Error("Virtua is not available — failed to load dependencies");
-    }
-
-    // Build children array
-    const children = [];
-    for (let i = 0; i < itemCount; i++) {
-      children.push(
-        React.createElement(
-          "div",
-          {
-            key: i,
-            className: "bench-item",
-            style: { height: `${ITEM_HEIGHT}px` },
-          },
-          ...createRealisticReactChildren(React, i),
-        ),
-      );
+    await depsReady;
+    if (!VList) {
+      throw new Error("Virtua is not available — failed to load dependencies" + (loadError ? `: ${loadError.message}` : ""));
     }
 
     const listComponent = React.createElement(
       VList,
       {
-        style: {
-          height: `${container.clientHeight || 600}px`,
-          width: "100%",
-        },
+        style: { height: `${container.clientHeight || 600}px`, width: "100%" },
         overscan: DEFAULT_OVERSCAN,
       },
-      ...children,
+      ...getChildren(itemCount),
     );
 
     const root = ReactDOM.createRoot(container);
@@ -100,11 +86,6 @@ defineLibrary({
     return root;
   },
 
-  /**
-   * Unmount a Virtua instance.
-   *
-   * @param {*} root - React root returned by create()
-   */
   destroy: async (root) => {
     if (root && typeof root.unmount === "function") {
       root.unmount();

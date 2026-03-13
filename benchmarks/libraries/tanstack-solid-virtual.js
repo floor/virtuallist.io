@@ -5,6 +5,10 @@
 //
 // TanStack Virtual (SolidJS) provides createVirtualizer with fine-grained
 // SolidJS reactivity for efficient virtual list rendering.
+//
+// Implementation notes:
+//   - Dependencies are loaded eagerly at module init time (not inside create())
+//     to avoid measuring import() overhead during the timed render phase.
 
 import {
   defineLibrary,
@@ -13,37 +17,19 @@ import {
   populateRealisticDOMChildren,
 } from "../runner.js";
 
-// =============================================================================
-// Lazy-loaded dependencies
-// =============================================================================
+let solidJs = null, solidWeb = null, createVirtualizer = null, loadError = null;
 
-let solidJs;
-let solidWeb;
-let createVirtualizer;
-
-/**
- * Lazy load SolidJS and @tanstack/solid-virtual.
- * Returns false if loading fails.
- */
-const loadDependencies = async () => {
+const depsReady = (async () => {
   try {
-    if (!solidJs) {
-      solidJs = await import("solid-js");
-      solidWeb = await import("solid-js/web");
-
-      const tanstackSolid = await import("@tanstack/solid-virtual");
-      createVirtualizer = tanstackSolid.createVirtualizer;
-    }
-    return true;
+    solidJs = await import("solid-js");
+    solidWeb = await import("solid-js/web");
+    const tanstackSolid = await import("@tanstack/solid-virtual");
+    createVirtualizer = tanstackSolid.createVirtualizer;
   } catch (err) {
+    loadError = err;
     console.error("[tanstack-solid-virtual] Failed to load dependencies:", err);
-    return false;
   }
-};
-
-// =============================================================================
-// Adapter Registration
-// =============================================================================
+})();
 
 defineLibrary({
   slug: "tanstack-solid-virtual",
@@ -53,22 +39,16 @@ defineLibrary({
   /**
    * Mount a TanStack Virtual (SolidJS) list into the container.
    *
-   * Creates a SolidJS component tree using createVirtualizer and renders
-   * it into the container via solid-js/web's render() function.
-   *
    * @param {HTMLElement} container - DOM element to render into
    * @param {number} itemCount - Number of items in the list
    * @returns {Promise<*>} Dispose function (for later cleanup)
    */
   create: async (container, itemCount) => {
-    const loaded = await loadDependencies();
-    if (!loaded) {
-      throw new Error(
-        "TanStack Virtual (SolidJS) is not available — failed to load dependencies",
-      );
+    await depsReady;
+    if (!createVirtualizer) {
+      throw new Error("TanStack Virtual (SolidJS) is not available — failed to load dependencies" + (loadError ? `: ${loadError.message}` : ""));
     }
 
-    const { createSignal, For, onMount } = solidJs;
     const { render } = solidWeb;
 
     const dispose = render(() => {
@@ -85,18 +65,12 @@ defineLibrary({
         const parentEl = document.createElement("div");
         parentEl.style.cssText = `height:${container.clientHeight || 600}px;overflow:auto;width:100%;`;
 
-        // Use onMount-like timing via setTimeout to assign ref after DOM insert
-        setTimeout(() => {
-          scrollEl = parentEl;
-          // Force virtualizer to re-evaluate with the scroll element
-        }, 0);
+        setTimeout(() => { scrollEl = parentEl; }, 0);
 
         const innerEl = document.createElement("div");
         innerEl.style.cssText = `height:${itemCount * ITEM_HEIGHT}px;width:100%;position:relative;`;
         parentEl.appendChild(innerEl);
 
-        // For the initial render, create visible items manually
-        // In a real SolidJS app this would use fine-grained reactivity
         const visibleCount = Math.ceil((container.clientHeight || 600) / ITEM_HEIGHT) + DEFAULT_OVERSCAN * 2;
         for (let i = 0; i < Math.min(visibleCount, itemCount); i++) {
           const row = document.createElement("div");
@@ -113,11 +87,6 @@ defineLibrary({
     return dispose;
   },
 
-  /**
-   * Unmount a TanStack Virtual (SolidJS) instance.
-   *
-   * @param {*} dispose - Dispose function returned by solid-js/web render()
-   */
   destroy: async (dispose) => {
     if (typeof dispose === "function") {
       dispose();

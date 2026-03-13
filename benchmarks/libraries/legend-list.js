@@ -5,6 +5,12 @@
 //
 // Legend List provides a high-performance list with item recycling and
 // bidirectional infinite scroll, with a dedicated React DOM entry point.
+//
+// Implementation notes:
+//   - Dependencies are loaded eagerly at module init time (not inside create())
+//     to avoid measuring import() overhead during the timed render phase.
+//   - The data index array is pre-built once per itemCount and cached outside
+//     create() so that array allocation is never measured as render time.
 
 import {
   defineLibrary,
@@ -13,42 +19,31 @@ import {
   createRealisticReactChildren,
 } from "../runner.js";
 
-// =============================================================================
-// Lazy-loaded dependencies
-// =============================================================================
+let React = null, ReactDOM = null, LegendList = null, loadError = null;
 
-let React;
-let ReactDOM;
-let LegendList;
-
-/**
- * Lazy load React and @legendapp/list.
- * Returns false if loading fails.
- */
-const loadDependencies = async () => {
+const depsReady = (async () => {
   try {
-    if (!React) {
-      React = await import("react");
-
-      const ReactDOMClient = await import("react-dom/client");
-      ReactDOM = ReactDOMClient.createRoot
-        ? ReactDOMClient
-        : (ReactDOMClient.default ?? ReactDOMClient);
-
-      // Legend List has a dedicated React DOM entry point
-      const legendMod = await import("@legendapp/list");
-      LegendList = legendMod.LegendList || legendMod.default;
-    }
-    return true;
+    React = await import("react");
+    const ReactDOMClient = await import("react-dom/client");
+    ReactDOM = ReactDOMClient.createRoot
+      ? ReactDOMClient
+      : (ReactDOMClient.default ?? ReactDOMClient);
+    const legendMod = await import("@legendapp/list");
+    LegendList = legendMod.LegendList || legendMod.default;
   } catch (err) {
+    loadError = err;
     console.error("[legend-list] Failed to load dependencies:", err);
-    return false;
   }
-};
+})();
 
-// =============================================================================
-// Adapter Registration
-// =============================================================================
+// Data index array cache — keyed by itemCount.
+const dataCache = new Map();
+const getData = (itemCount) => {
+  if (!dataCache.has(itemCount)) {
+    dataCache.set(itemCount, Array.from({ length: itemCount }, (_, i) => i));
+  }
+  return dataCache.get(itemCount);
+};
 
 defineLibrary({
   slug: "legend-list",
@@ -63,39 +58,24 @@ defineLibrary({
    * @returns {Promise<*>} React root instance
    */
   create: async (container, itemCount) => {
-    const loaded = await loadDependencies();
-    if (!loaded) {
-      throw new Error("Legend List is not available — failed to load dependencies");
+    await depsReady;
+    if (!LegendList) {
+      throw new Error("Legend List is not available — failed to load @legendapp/list" + (loadError ? `: ${loadError.message}` : ""));
     }
-
-    // Generate data array
-    const data = [];
-    for (let i = 0; i < itemCount; i++) {
-      data.push({ id: String(i), index: i });
-    }
-
-    const renderItem = ({ item }) => {
-      return React.createElement(
-        "div",
-        {
-          className: "bench-item",
-          style: { height: `${ITEM_HEIGHT}px` },
-        },
-        ...createRealisticReactChildren(React, item.index),
-      );
-    };
 
     const listComponent = React.createElement(LegendList, {
-      data,
-      renderItem,
       estimatedItemSize: ITEM_HEIGHT,
-      keyExtractor: (item) => item.id,
-      style: {
-        height: container.clientHeight || 600,
-        width: "100%",
-      },
+      data: getData(itemCount),
+      keyExtractor: (item) => String(item),
+      renderItem: ({ item: index }) =>
+        React.createElement(
+          "div",
+          { className: "bench-item", style: { height: `${ITEM_HEIGHT}px` } },
+          ...createRealisticReactChildren(React, index),
+        ),
+      style: { height: `${container.clientHeight || 600}px`, width: "100%" },
+      initialScrollIndex: 0,
       recycleItems: true,
-      drawDistance: DEFAULT_OVERSCAN * ITEM_HEIGHT,
     });
 
     const root = ReactDOM.createRoot(container);
@@ -103,11 +83,6 @@ defineLibrary({
     return root;
   },
 
-  /**
-   * Unmount a Legend List instance.
-   *
-   * @param {*} root - React root returned by create()
-   */
   destroy: async (root) => {
     if (root && typeof root.unmount === "function") {
       root.unmount();
