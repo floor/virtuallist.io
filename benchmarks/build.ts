@@ -70,10 +70,23 @@ const frameworkDedupePlugin: import("bun").BunPlugin = {
       }
     });
 
-    // SolidJS — always resolve from project root
+    // SolidJS — resolve to browser builds (not server builds)
+    // solid-js's package.json exports use conditional exports where the
+    // default/node/module entries point to dist/server.js which throws
+    // "Client-only API called on the server side". require.resolve()
+    // runs in Bun/Node context so it picks the server entry. We
+    // explicitly map each sub-path to its browser bundle.
+    const solidBrowserMap: Record<string, string> = {
+      "solid-js": "solid-js/dist/solid.js",
+      "solid-js/web": "solid-js/web/dist/web.js",
+      "solid-js/store": "solid-js/store/dist/store.js",
+    };
+
     build.onResolve({ filter: /^solid-js(\/.*)?$/ }, (args) => {
       try {
-        const resolved = require.resolve(args.path, {
+        const browserEntry = solidBrowserMap[args.path];
+        const target = browserEntry ?? args.path;
+        const resolved = require.resolve(target, {
           paths: [PROJECT_ROOT],
         });
         return { path: resolved };

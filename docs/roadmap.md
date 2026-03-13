@@ -98,14 +98,9 @@ The Nginx approach is sufficient for production. Development compression is a qu
 
 ## Adapters That Need Validation or Improvement
 
-### `tanstack-solid-virtual.js` — Simplified render
+### ~~`tanstack-solid-virtual.js` — Simplified render~~ ✅ Done
 
-The current implementation uses manual DOM construction rather than SolidJS's fine-grained reactivity system. The initial render is correct and measures render time and memory accurately, but the scroll phase does not exercise SolidJS's reactive update path — the list does not re-render items as the scroll position changes.
-
-**What it needs:**
-- A proper SolidJS component using `createVirtualizer` from `@tanstack/solid-virtual`
-- Compiled with Babel + `babel-preset-solid` (already in `devDependencies`)
-- The Bun build script updated to apply the Solid Babel transform to this adapter's output
+Resolved: the adapter now uses Solid's imperative reactive APIs (`createSignal`, `createEffect`) with direct DOM manipulation. The virtualizer's `getVirtualItems()` reactive store and `getTotalSize()` signal drive a `createEffect` that reconciles DOM nodes on every scroll update — exercising the real Solid reactive pipeline without needing JSX or a Babel transform.
 
 ---
 

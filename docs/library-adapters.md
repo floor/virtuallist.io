@@ -201,9 +201,16 @@ Returns `{ app, wrapper }`. `destroy()` calls `app.unmount()` and removes the wr
 **Library:** @tanstack/solid-virtual  
 **Hook:** `createVirtualizer`
 
-⚠️ **This adapter uses a simplified implementation.** The current version uses manual DOM construction for initial rendering rather than full SolidJS fine-grained reactivity. It produces a correct initial render and is suitable for render-time and memory measurement, but the scroll phase may not reflect the library's true reactive performance. See [roadmap.md](./roadmap.md).
+Uses Solid's imperative reactive APIs (`createSignal`, `createEffect`) with direct DOM manipulation — no JSX or Babel transform needed. The adapter:
 
-Uses `solid-js/web` `render()` to mount a SolidJS component tree. Returns the dispose function. `destroy()` calls the dispose function.
+1. Creates a reactive signal for the scroll element ref (starts `null`, set via `queueMicrotask` after mount)
+2. Instantiates `createVirtualizer` with the reactive `scrollEl()` getter
+3. Uses `createEffect` to reactively reconcile DOM nodes when `getVirtualItems()` or `getTotalSize()` change
+4. Maintains a `Map<index, HTMLElement>` of rendered rows, diffing against the new virtual items each cycle
+
+This exercises the real Solid reactive pipeline: scroll events → virtualizer updates its reactive store (`createStore` + `reconcile` internally) → `createEffect` fires → DOM nodes are added/removed/repositioned.
+
+Uses `solid-js/web` `render()` to mount the reactive tree. Returns the dispose function. `destroy()` calls the dispose function.
 
 ---
 
@@ -262,6 +269,6 @@ The `_TEMPLATE.js` file is fully documented with inline comments and examples fo
 | `virtua` | ✅ Implemented | Pre-builds children array |
 | `legend-list` | ✅ Implemented | Needs validation against actual package API |
 | `vue-virtual-scroller` | ✅ Implemented | |
-| `tanstack-solid-virtual` | ⚠️ Partial | Simplified render — not fully reactive |
+| `tanstack-solid-virtual` | ✅ Implemented | Imperative reactive APIs (no JSX/Babel needed) |
 | `clusterize` | ✅ Implemented | Pre-generates all HTML upfront |
 | `vlist` | ✅ Implemented | |
