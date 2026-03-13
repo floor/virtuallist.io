@@ -59,7 +59,10 @@ function initFilters() {
     buttons.forEach((btn) => {
       const stress = parseInt(btn.dataset.stress, 10);
 
-      btn.classList.toggle("ui-segmented__btn--active", stress === currentStress);
+      btn.classList.toggle(
+        "ui-segmented__btn--active",
+        stress === currentStress,
+      );
 
       btn.addEventListener("click", () => {
         if (stress === currentStress) return;
@@ -74,8 +77,8 @@ function initFilters() {
 // =============================================================================
 
 /** Current sort state. */
-let sortMetric = "Scroll FPS";
-let sortDirection = "desc"; // "asc" or "desc"
+let sortMetric = "Render";
+let sortDirection = "asc"; // "asc" or "desc"
 
 function initSorting() {
   const headers = document.querySelectorAll(".res-table__th--sortable");
@@ -145,13 +148,16 @@ function sortTable(tbody, metric, direction) {
 }
 
 function getMetricColIndex(metric) {
-  const order = ["Render", "Memory", "Scroll FPS", "P95 Frame"];
+  const order = ["Render", "Memory", "Scroll FPS", "P95 Frame", "Jump"];
   return order.indexOf(metric);
 }
 
 function updateSortIndicators(headers, activeMetric) {
   headers.forEach((th) => {
-    th.classList.toggle("res-table__th--sorted", th.dataset.metric === activeMetric);
+    th.classList.toggle(
+      "res-table__th--sorted",
+      th.dataset.metric === activeMetric,
+    );
   });
 }
 

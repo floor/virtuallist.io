@@ -16,6 +16,8 @@
 //     changes, the virtualizer updates these reactively, which triggers our
 //     createEffect to reconcile the DOM — exercising the real Solid update path.
 
+import { createSignal, createEffect, onCleanup } from "solid-js";
+import { render } from "solid-js/web";
 import {
   defineLibrary,
   ITEM_HEIGHT,
@@ -23,15 +25,11 @@ import {
   populateRealisticDOMChildren,
 } from "../runner.js";
 
-let solidJs = null,
-  solidWeb = null,
-  createVirtualizer = null,
+let createVirtualizer = null,
   loadError = null;
 
 const depsReady = (async () => {
   try {
-    solidJs = await import("solid-js");
-    solidWeb = await import("solid-js/web");
     const tanstackSolid = await import("@tanstack/solid-virtual");
     createVirtualizer = tanstackSolid.createVirtualizer;
   } catch (err) {
@@ -69,9 +67,6 @@ defineLibrary({
           (loadError ? `: ${loadError.message}` : ""),
       );
     }
-
-    const { createSignal, createEffect, onCleanup } = solidJs;
-    const { render } = solidWeb;
 
     const height = container.clientHeight || 600;
 

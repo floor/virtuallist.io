@@ -32,6 +32,7 @@
     "table_memory": "Memory",
     "table_fps": "Scroll FPS",
     "table_p95": "P95 Frame",
+    "table_jump": "Jump",
     "table_runs": "Runs",
     "confidence_high": "High confidence",
     "confidence_moderate": "Moderate confidence",

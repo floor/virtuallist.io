@@ -25,6 +25,8 @@ export {
   DEFAULT_OVERSCAN,
   SCROLL_SPEEDS,
   STRESS_LEVELS,
+  JUMP_ITERATIONS,
+  JUMP_TARGETS,
   ITEM_NAMES,
   ITEM_BADGES,
 } from "./constants.js";
@@ -37,6 +39,8 @@ import {
   BASE_SCROLL_SPEED,
   DEFAULT_OVERSCAN,
   SCROLL_SPEEDS,
+  JUMP_ITERATIONS,
+  JUMP_TARGETS,
   ITEM_NAMES,
   ITEM_BADGES,
 } from "./constants.js";
@@ -644,6 +648,77 @@ export const measureScrollPerformance = async (
 };
 
 // =============================================================================
+// Scroll-to-Index Measurement
+// =============================================================================
+
+/**
+ * Measure how fast a library renders after a large scroll position jump.
+ *
+ * Simulates "teleporting" the viewport to a distant item index by setting
+ * scrollTop directly. This forces the library to virtualise a completely
+ * new set of items — measuring DOM recycling / creation speed when the
+ * visible window changes drastically (as opposed to smooth incremental
+ * scrolling measured by measureScrollPerformance).
+ *
+ * Methodology:
+ *   1. For each target fraction, compute scrollTop = fraction * itemCount * ITEM_HEIGHT.
+ *   2. Reset the viewport to a position with zero overlap with the target.
+ *   3. Wait two frames for the library to finish rendering the reset position.
+ *   4. Set scrollTop to the target and measure time until the next rAF
+ *      callback fires (browser has committed layout + paint with new items).
+ *   5. Repeat JUMP_ITERATIONS times per target, collect all times.
+ *   6. Return the overall median across all targets and iterations.
+ *
+ * @param {HTMLElement} viewport - Scrollable element (from findViewport)
+ * @param {number} itemCount - Total number of items in the list
+ * @param {number[]} [targets=JUMP_TARGETS] - Target positions as fractions of itemCount
+ * @param {number} [iterations=JUMP_ITERATIONS] - Iterations per target
+ * @returns {Promise<number>} Median jump-to-paint time in ms (0 if viewport is null)
+ */
+export const measureScrollToIndex = async (
+  viewport,
+  itemCount,
+  targets = JUMP_TARGETS,
+  iterations = JUMP_ITERATIONS,
+) => {
+  if (!viewport) return 0;
+
+  const maxScroll = viewport.scrollHeight - viewport.clientHeight;
+  const allTimes = [];
+
+  for (const fraction of targets) {
+    const targetScroll = Math.min(
+      Math.round(fraction * itemCount * ITEM_HEIGHT),
+      maxScroll,
+    );
+
+    for (let i = 0; i < iterations; i++) {
+      // ── Reset to a neutral position far from the target ────────────
+      // Pick a position that guarantees zero overlap with the target's
+      // visible window so the library must create/recycle every row.
+      const resetScroll = fraction >= 0.5 ? 0 : maxScroll;
+      viewport.scrollTop = resetScroll;
+
+      // Let the library finish rendering the reset position
+      await nextFrame();
+      await nextFrame();
+
+      // ── Jump and measure ───────────────────────────────────────────
+      const t0 = performance.now();
+      viewport.scrollTop = targetScroll;
+
+      // Wait for the browser to commit layout + paint with the new items
+      await nextFrame();
+
+      const t1 = performance.now();
+      allTimes.push(t1 - t0);
+    }
+  }
+
+  return allTimes.length > 0 ? round(median(allTimes), 2) : 0;
+};
+
+// =============================================================================
 // Memory Measurement with Retries
 // =============================================================================
 
@@ -836,6 +911,21 @@ export const benchmarkLibrary = async ({
     });
   }
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // Phase 4: Scroll-to-Index (Jump)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // Reuses the same mounted instance and viewport from the scroll phase.
+  // Measures how fast the library virtualises a new set of items when
+  // the scroll position teleports to a distant index.
+
+  const totalJumps = JUMP_TARGETS.length * JUMP_ITERATIONS;
+  onStatus(`Measuring ${libraryName} jump (0/${totalJumps})...`);
+
+  const jumpTime = await measureScrollToIndex(viewport, itemCount);
+
+  onStatus(`Measuring ${libraryName} jump (${totalJumps}/${totalJumps})...`);
+
   // Clean up
   if (memInstance) {
     await destroyComponent(memInstance);
@@ -859,6 +949,7 @@ export const benchmarkLibrary = async ({
     scrollResults,
     avgFPS: round(avgFn(allFPS), 1),
     avgP95: round(avgFn(allP95), 2),
+    jumpTime,
   };
 };
 
@@ -956,6 +1047,17 @@ export const buildMetrics = (results) => {
       unit: "ms",
       better: "lower",
       rating: rateLower(results.avgP95, 12, 20),
+    });
+  }
+
+  // Jump time (scroll-to-index)
+  if (results.jumpTime > 0) {
+    metrics.push({
+      label: "Jump",
+      value: results.jumpTime,
+      unit: "ms",
+      better: "lower",
+      rating: rateLower(results.jumpTime, 10, 25),
     });
   }
 

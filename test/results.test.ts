@@ -148,10 +148,10 @@ describe("results page — HTML content", () => {
     expect(html).toContain('data-metric="P95 Frame"');
   });
 
-  it("marks Scroll FPS as the default sorted column", async () => {
+  it("marks Render as the default sorted column", async () => {
     const html = await getHtml("/benchmarks/results");
-    // The Scroll FPS header should have the --sorted class
-    expect(html).toContain('res-table__th--sorted" data-metric="Scroll FPS"');
+    // The Render header should have the --sorted class
+    expect(html).toContain('res-table__th--sorted" data-metric="Render"');
   });
 
   it("includes column direction hints (data-better)", async () => {
@@ -160,6 +160,7 @@ describe("results page — HTML content", () => {
     expect(html).toContain('data-metric="Memory" data-better="lower"');
     expect(html).toContain('data-metric="Scroll FPS" data-better="higher"');
     expect(html).toContain('data-metric="P95 Frame" data-better="lower"');
+    expect(html).toContain('data-metric="Jump" data-better="lower"');
   });
 
   it("includes the confidence legend", async () => {

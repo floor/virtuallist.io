@@ -42,10 +42,11 @@
         <tr>
           <th class="res-table__th res-table__th--rank">#</th>
           <th class="res-table__th res-table__th--library"><%= it.t("results.table_library") %></th>
-          <th class="res-table__th res-table__th--metric res-table__th--sortable" data-metric="Render" data-better="lower"><%= it.t("results.table_render") %></th>
+          <th class="res-table__th res-table__th--metric res-table__th--sortable res-table__th--sorted" data-metric="Render" data-better="lower"><%= it.t("results.table_render") %></th>
           <th class="res-table__th res-table__th--metric res-table__th--sortable" data-metric="Memory" data-better="lower"><%= it.t("results.table_memory") %></th>
-          <th class="res-table__th res-table__th--metric res-table__th--sortable res-table__th--sorted" data-metric="Scroll FPS" data-better="higher"><%= it.t("results.table_fps") %></th>
+          <th class="res-table__th res-table__th--metric res-table__th--sortable" data-metric="Scroll FPS" data-better="higher"><%= it.t("results.table_fps") %></th>
           <th class="res-table__th res-table__th--metric res-table__th--sortable" data-metric="P95 Frame" data-better="lower"><%= it.t("results.table_p95") %></th>
+          <th class="res-table__th res-table__th--metric res-table__th--sortable" data-metric="Jump" data-better="lower"><%= it.t("results.table_jump") %></th>
           <th class="res-table__th res-table__th--runs"><%= it.t("results.table_runs") %></th>
         </tr>
       </thead>
@@ -98,6 +99,17 @@
             <span class="res-unit"><%= row.p95.unit %></span>
             <% if (row.p95.range) { %>
             <span class="res-range"><%= row.p95.range %></span>
+            <% } %>
+            <% } else { %>
+            <span class="res-nodata"><%= it.t("results.no_data") %></span>
+            <% } %>
+          </td>
+          <td class="res-table__td res-table__td--metric<%= row.jump.best ? ' res-table__td--best' : '' %>" data-value="<%= row.jump.value %>">
+            <% if (row.jump.value !== null) { %>
+            <span class="res-val"><%= row.jump.display %></span>
+            <span class="res-unit"><%= row.jump.unit %></span>
+            <% if (row.jump.range) { %>
+            <span class="res-range"><%= row.jump.range %></span>
             <% } %>
             <% } else { %>
             <span class="res-nodata"><%= it.t("results.no_data") %></span>

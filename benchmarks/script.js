@@ -22,14 +22,21 @@
 
 // React
 import "./libraries/legend-list.js";
+import "./libraries/react-virtualized.js";
 import "./libraries/react-virtuoso.js";
 import "./libraries/react-window.js";
 import "./libraries/tanstack-virtual.js";
 import "./libraries/virtua.js";
+import "./libraries/vlist-react.js";
 // Vue
+import "./libraries/tanstack-vue-virtual.js";
 import "./libraries/vue-virtual-scroller.js";
+import "./libraries/vlist-vue.js";
 // SolidJS
 import "./libraries/tanstack-solid-virtual.js";
+import "./libraries/vlist-solidjs.js";
+// Svelte
+import "./libraries/vlist-svelte.js";
 // Vanilla
 import "./libraries/clusterize.js";
 import "./libraries/vlist.js";
@@ -324,12 +331,17 @@ async function handleRunClick() {
  * This is a heuristic — it maps known status message patterns to progress values.
  */
 function updateProgressFromStatus(slug, message) {
+  // Progress budget:
+  //   Render  0–15%   (15%)
+  //   Memory  15–30%  (15%)
+  //   Scroll  30–85%  (55%)
+  //   Jump    85–100% (15%)
+
   // Render phase: "Measuring X render (N/5)..."
   const renderMatch = message.match(/render \((\d+)\/(\d+)\)/);
   if (renderMatch) {
     const current = parseInt(renderMatch[1], 10);
     const total = parseInt(renderMatch[2], 10);
-    // Render is ~15% of total time
     const progress = (current / total) * 15;
     setProgress(slug, progress);
     return;
@@ -340,15 +352,14 @@ function updateProgressFromStatus(slug, message) {
   if (memMatch) {
     const current = parseInt(memMatch[1], 10);
     const total = parseInt(memMatch[2], 10);
-    // Memory is ~20% of total time (15% → 35%)
-    const progress = 15 + (current / total) * 20;
+    const progress = 15 + (current / total) * 15;
     setProgress(slug, progress);
     return;
   }
 
   // Memory not available
   if (message.includes("memory (not available)")) {
-    setProgress(slug, 25);
+    setProgress(slug, 22);
     return;
   }
 
@@ -357,8 +368,17 @@ function updateProgressFromStatus(slug, message) {
   if (scrollMatch) {
     const current = parseInt(scrollMatch[1], 10);
     const total = parseInt(scrollMatch[2], 10);
-    // Scroll is ~65% of total time (35% → 100%)
-    const progress = 35 + (current / total) * 60;
+    const progress = 30 + (current / total) * 55;
+    setProgress(slug, progress);
+    return;
+  }
+
+  // Jump phase: "Measuring X jump (N/15)..."
+  const jumpMatch = message.match(/jump \((\d+)\/(\d+)\)/);
+  if (jumpMatch) {
+    const current = parseInt(jumpMatch[1], 10);
+    const total = parseInt(jumpMatch[2], 10);
+    const progress = 85 + (current / total) * 15;
     setProgress(slug, progress);
     return;
   }

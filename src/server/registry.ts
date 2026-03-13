@@ -113,6 +113,18 @@ const LIBRARIES: LibraryInfo[] = [
     order: 30,
   },
   {
+    slug: "react-virtualized",
+    name: "react-virtualized",
+    tagline: "Feature-rich windowed list, grid, and table components for React",
+    ecosystem: "react",
+    npm: "react-virtualized",
+    github: "https://github.com/bvaughn/react-virtualized",
+    npmUrl: "https://www.npmjs.com/package/react-virtualized",
+    homepage: "https://bvaughn.github.io/react-virtualized",
+    enabled: true,
+    order: 35,
+  },
+  {
     slug: "tanstack-virtual",
     name: "TanStack Virtual",
     tagline: "Headless virtualizer hook (useVirtualizer) for React",
@@ -123,6 +135,19 @@ const LIBRARIES: LibraryInfo[] = [
     homepage: "https://tanstack.com/virtual",
     enabled: true,
     order: 40,
+  },
+  {
+    slug: "vlist-react",
+    name: "VList (React)",
+    tagline:
+      "React useVList hook wrapping the zero-dependency @floor/vlist engine",
+    ecosystem: "react",
+    npm: "vlist-react",
+    github: "https://github.com/floor/vlist-react",
+    npmUrl: "https://www.npmjs.com/package/vlist-react",
+    homepage: "https://vlist.dev",
+    enabled: true,
+    order: 50,
   },
   {
     slug: "virtua",
@@ -137,6 +162,31 @@ const LIBRARIES: LibraryInfo[] = [
   },
 
   // ── Vue Ecosystem ───────────────────────────────────────────────────────
+  {
+    slug: "tanstack-vue-virtual",
+    name: "TanStack Virtual (Vue)",
+    tagline: "Headless useVirtualizer composable with Vue 3 reactivity",
+    ecosystem: "vue",
+    npm: "@tanstack/vue-virtual",
+    github: "https://github.com/TanStack/virtual",
+    npmUrl: "https://www.npmjs.com/package/@tanstack/vue-virtual",
+    homepage: "https://tanstack.com/virtual",
+    enabled: true,
+    order: 95,
+  },
+  {
+    slug: "vlist-vue",
+    name: "VList (Vue)",
+    tagline:
+      "Vue 3 useVList composable wrapping the zero-dependency @floor/vlist engine",
+    ecosystem: "vue",
+    npm: "vlist-vue",
+    github: "https://github.com/floor/vlist-vue",
+    npmUrl: "https://www.npmjs.com/package/vlist-vue",
+    homepage: "https://vlist.dev",
+    enabled: true,
+    order: 96,
+  },
   {
     slug: "vue-virtual-scroller",
     name: "vue-virtual-scroller",
@@ -161,6 +211,34 @@ const LIBRARIES: LibraryInfo[] = [
     homepage: "https://tanstack.com/virtual",
     enabled: true,
     order: 200,
+  },
+  {
+    slug: "vlist-solidjs",
+    name: "VList (SolidJS)",
+    tagline:
+      "SolidJS createVList primitive wrapping the zero-dependency @floor/vlist engine",
+    ecosystem: "solid",
+    npm: "vlist-solidjs",
+    github: "https://github.com/floor/vlist-solidjs",
+    npmUrl: "https://www.npmjs.com/package/vlist-solidjs",
+    homepage: "https://vlist.dev",
+    enabled: true,
+    order: 201,
+  },
+
+  // ── Svelte Ecosystem ───────────────────────────────────────────────────
+  {
+    slug: "vlist-svelte",
+    name: "VList (Svelte)",
+    tagline:
+      "Svelte use:vlist action wrapping the zero-dependency @floor/vlist engine",
+    ecosystem: "svelte",
+    npm: "vlist-svelte",
+    github: "https://github.com/floor/vlist-svelte",
+    npmUrl: "https://www.npmjs.com/package/vlist-svelte",
+    homepage: "https://vlist.dev",
+    enabled: true,
+    order: 250,
   },
 
   // ── Vanilla / Framework-agnostic ──────────────────────────────────────

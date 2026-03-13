@@ -29,6 +29,22 @@ export const MEMORY_ATTEMPTS = 5;
 /** Scroll test duration per speed level (ms). */
 export const SCROLL_DURATION_MS = 1500;
 
+/** Number of iterations per jump target for median calculation. */
+export const JUMP_ITERATIONS = 5;
+
+/**
+ * Scroll-to-index jump targets as fractions of total item count.
+ *
+ * Each target produces a large scroll displacement that forces the library
+ * to virtualise a completely new set of items — measuring how fast it
+ * recycles/creates DOM nodes when the viewport teleports.
+ *
+ *   - 0.50 — jump to the middle (cold region, no items pre-rendered)
+ *   - 0.95 — jump near the end (tests large scrollTop + boundary handling)
+ *   - 0.00 — jump back to the start (return trip, re-render top items)
+ */
+export const JUMP_TARGETS = [0.5, 0.95, 0.0];
+
 // =============================================================================
 // Scroll Speed Presets
 // =============================================================================

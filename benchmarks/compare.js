@@ -20,8 +20,13 @@ import "./libraries/tanstack-virtual.js";
 import "./libraries/react-virtuoso.js";
 import "./libraries/virtua.js";
 import "./libraries/legend-list.js";
+import "./libraries/vlist-react.js";
 import "./libraries/vue-virtual-scroller.js";
+import "./libraries/vlist-vue.js";
 import "./libraries/tanstack-solid-virtual.js";
+import "./libraries/vlist-solidjs.js";
+// Svelte
+import "./libraries/vlist-svelte.js";
 import "./libraries/clusterize.js";
 import "./libraries/vlist.js";
 
@@ -33,6 +38,7 @@ import {
   getLibraries,
   benchmarkLibrary,
   buildMetrics,
+  persistResult,
   pickWinner,
   tryGC,
   waitFrames,
@@ -382,7 +388,24 @@ async function handleRunClick() {
         });
 
         rawResults.set(slug, raw);
-        allMetrics.set(slug, buildMetrics(raw));
+        const metrics = buildMetrics(raw);
+        allMetrics.set(slug, metrics);
+
+        // Persist to server (fire-and-forget) — same as individual benchmark
+        // pages, so compare runs contribute to the crowdsourced results dataset.
+        persistResult(
+          {
+            librarySlug: slug,
+            itemCount: selectedItemCount,
+            metrics,
+            duration: raw.duration ?? 0,
+            success: true,
+          },
+          {
+            stressMs: selectedStressMs,
+            scrollSpeed: 0,
+          },
+        );
       } catch (err) {
         if (err.name === "AbortError") {
           // Mark remaining slugs as absent (undefined) — they simply won't appear
@@ -391,7 +414,11 @@ async function handleRunClick() {
         // Non-abort failure: record null so the column shows an error state
         rawResults.set(slug, null);
         allMetrics.set(slug, null);
-        console.warn(`[compare] ${name} failed:`, err);
+        console.error(`[compare] ${name} failed with error:`, err);
+        console.error(
+          `[compare] Error name: ${err.name}, message: ${err.message}`,
+        );
+        console.error(`[compare] Stack:`, err.stack);
       }
 
       await tryGC();

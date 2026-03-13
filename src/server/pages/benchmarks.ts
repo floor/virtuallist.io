@@ -242,10 +242,18 @@ function assembleComparePage(locale: string): string {
 // =============================================================================
 
 /** Metric labels in display order. */
-const METRIC_ORDER = ["Render", "Memory", "Scroll FPS", "P95 Frame"] as const;
+const METRIC_ORDER = [
+  "Render",
+  "Memory",
+  "Scroll FPS",
+  "P95 Frame",
+  "Jump",
+] as const;
 
 /** Map a metric label to a short key used in template row objects. */
-function metricKey(label: string): "render" | "memory" | "fps" | "p95" {
+function metricKey(
+  label: string,
+): "render" | "memory" | "fps" | "p95" | "jump" {
   switch (label) {
     case "Render":
       return "render";
@@ -255,6 +263,8 @@ function metricKey(label: string): "render" | "memory" | "fps" | "p95" {
       return "fps";
     case "P95 Frame":
       return "p95";
+    case "Jump":
+      return "jump";
     default:
       return "render";
   }
@@ -292,6 +302,7 @@ interface ResultRow {
   memory: MetricCell;
   fps: MetricCell;
   p95: MetricCell;
+  jump: MetricCell;
 }
 
 function emptyCell(): MetricCell {
@@ -338,6 +349,7 @@ function buildResultRows(
       memory: emptyCell(),
       fps: emptyCell(),
       p95: emptyCell(),
+      jump: emptyCell(),
     };
 
     for (const metric of stat.metrics) {
@@ -357,15 +369,15 @@ function buildResultRows(
     rows.push(row);
   }
 
-  // Sort by Scroll FPS median (descending — higher is better) as default
+  // Sort by Render time median (ascending — lower is better) as default
   rows.sort((a, b) => {
-    const aVal = a.fps.value ?? -Infinity;
-    const bVal = b.fps.value ?? -Infinity;
-    return bVal - aVal;
+    const aVal = a.render.value ?? Infinity;
+    const bVal = b.render.value ?? Infinity;
+    return aVal - bVal;
   });
 
   // Mark "best" per metric column
-  for (const key of ["render", "memory", "fps", "p95"] as const) {
+  for (const key of ["render", "memory", "fps", "p95", "jump"] as const) {
     const better = key === "fps" ? "higher" : "lower";
     let bestVal: number | null = null;
 
