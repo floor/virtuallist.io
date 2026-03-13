@@ -20,19 +20,24 @@
 // are treated identically.
 // =============================================================================
 
+// React
+import "./libraries/legend-list.js";
+import "./libraries/react-virtuoso.js";
 import "./libraries/react-window.js";
 import "./libraries/tanstack-virtual.js";
-import "./libraries/react-virtuoso.js";
+import "./libraries/vlist-react.js";
 import "./libraries/virtua.js";
-import "./libraries/legend-list.js";
+// Vue
+import "./libraries/vlist-vue.js";
 import "./libraries/vue-virtual-scroller.js";
+// SolidJS
 import "./libraries/tanstack-solid-virtual.js";
+import "./libraries/vlist-solidjs.js";
+// Svelte
+import "./libraries/vlist-svelte.js";
+// Vanilla
 import "./libraries/clusterize.js";
 import "./libraries/vlist.js";
-import "./libraries/vlist-react.js";
-import "./libraries/vlist-vue.js";
-import "./libraries/vlist-solidjs.js";
-import "./libraries/vlist-svelte.js";
 
 // =============================================================================
 // Runner Imports
@@ -70,7 +75,9 @@ const results = new Map();
 // =============================================================================
 
 const dom = {
-  runBtn: /** @type {HTMLButtonElement} */ (document.getElementById("bench-run")),
+  runBtn: /** @type {HTMLButtonElement} */ (
+    document.getElementById("bench-run")
+  ),
   suitesContainer: document.getElementById("bench-suites"),
   viewport: document.getElementById("bench-viewport"),
   viewportInner: document.getElementById("bench-viewport-inner"),
@@ -97,7 +104,9 @@ const librarySlug = getLibrarySlug();
 function initEnvironmentTags() {
   // Chrome detection
   if (dom.chromeTag) {
-    const isChrome = /Chrome\//.test(navigator.userAgent) && !/Edg\//.test(navigator.userAgent);
+    const isChrome =
+      /Chrome\//.test(navigator.userAgent) &&
+      !/Edg\//.test(navigator.userAgent);
     dom.chromeTag.textContent = isChrome
       ? "Chrome — full metrics"
       : "⚠️ Use Chrome for memory metrics";
@@ -133,7 +142,9 @@ function wireControls() {
   }
 
   // ── Stress level buttons ───────────────────────────────────────────────
-  const stressBtns = document.querySelectorAll("#bench-stress .ui-segmented__btn");
+  const stressBtns = document.querySelectorAll(
+    "#bench-stress .ui-segmented__btn",
+  );
   for (const btn of stressBtns) {
     btn.addEventListener("click", () => {
       if (isRunning) return;
@@ -195,21 +206,22 @@ function renderMetrics(slug, metrics) {
   if (!container) return;
 
   // Only show the 4 core metrics (skip per-speed breakdowns)
-  const coreMetrics = metrics.filter(
-    (m) => !m.label.startsWith("FPS @"),
-  );
+  const coreMetrics = metrics.filter((m) => !m.label.startsWith("FPS @"));
 
-  const cards = coreMetrics.map((metric) => {
-    const ratingClass = metric.rating ? ` bench-metric--${metric.rating}` : "";
-    const isEmpty = metric.displayValue === "—";
-    const emptyClass = isEmpty ? " bench-metric--empty" : "";
+  const cards = coreMetrics
+    .map((metric) => {
+      const ratingClass = metric.rating
+        ? ` bench-metric--${metric.rating}`
+        : "";
+      const isEmpty = metric.displayValue === "—";
+      const emptyClass = isEmpty ? " bench-metric--empty" : "";
 
-    const valueText = metric.displayValue ?? metric.value;
-    const metaHtml = metric.meta
-      ? `<div class="bench-metric__meta">${escapeHtml(metric.meta)}</div>`
-      : "";
+      const valueText = metric.displayValue ?? metric.value;
+      const metaHtml = metric.meta
+        ? `<div class="bench-metric__meta">${escapeHtml(metric.meta)}</div>`
+        : "";
 
-    return `
+      return `
       <div class="bench-metric${ratingClass}${emptyClass}">
         <div class="bench-metric__label">${escapeHtml(metric.label)}</div>
         <div class="bench-metric__value">
@@ -218,7 +230,8 @@ function renderMetrics(slug, metrics) {
         ${metaHtml}
       </div>
     `;
-  }).join("");
+    })
+    .join("");
 
   container.innerHTML = cards;
 }
@@ -245,7 +258,10 @@ async function handleRunClick() {
   const adapter = getLibrary(librarySlug);
   if (!adapter) {
     console.error(`[script] No adapter registered for "${librarySlug}"`);
-    updateSuiteStatus(librarySlug, `❌ No benchmark adapter found for "${librarySlug}". Is the library adapter imported?`);
+    updateSuiteStatus(
+      librarySlug,
+      `❌ No benchmark adapter found for "${librarySlug}". Is the library adapter imported?`,
+    );
     return;
   }
 
@@ -391,9 +407,7 @@ function updateSuiteStatus(slug, message) {
   if (!el) return;
 
   // Clean up technical details from status messages
-  const cleaned = message
-    .replace(/\.\.\.$/, "…")
-    .replace(/^Testing /, "");
+  const cleaned = message.replace(/\.\.\.$/, "…").replace(/^Testing /, "");
 
   el.textContent = cleaned;
   el.className = isRunning
@@ -479,7 +493,7 @@ function init() {
   if (!adapter) {
     console.warn(
       `[virtuallist.io] No benchmark adapter for "${librarySlug}". ` +
-      `The library may not have an adapter file yet.`,
+        `The library may not have an adapter file yet.`,
     );
   }
 }
