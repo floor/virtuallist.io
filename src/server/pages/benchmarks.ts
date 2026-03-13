@@ -138,7 +138,7 @@ function assembleOverviewPage(locale: string): string {
       </div>`,
     t,
     activeNav: "benchmarks",
-    extraHead: `<style>${BENCH_CSS}</style>`,
+    extraHead: `<style>${BENCH_CSS}${COMPARE_CSS}</style>`,
     extraBody: "",
     mainClass: "",
   });
@@ -182,8 +182,48 @@ function assembleLibraryPage(lib: LibraryInfo, locale: string): string {
       </div>`,
     t,
     activeNav: "benchmarks",
-    extraHead: `<style>${BENCH_CSS}</style>`,
+    extraHead: `<style>${BENCH_CSS}${COMPARE_CSS}</style>`,
     extraBody: `<script type="module" src="/dist/benchmarks/script.js"></script>`,
+    mainClass: "",
+  });
+}
+
+function assembleComparePage(locale: string): string {
+  const t = makeT(locale, "benchmarks");
+  const ecosystems = buildEcosystemData();
+
+  // Render compare page content
+  const compareContent = renderTemplate("benchmarks-compare", {
+    t,
+    itemCounts: ITEM_COUNTS,
+    initialItemCount: INITIAL_ITEM_COUNT,
+    stressLevels: STRESS_LEVELS,
+    formatItemCount,
+  });
+
+  // Render sidebar — pass "compare" as activeSlug so the Compare link lights up
+  const sidebar = renderTemplate("benchmarks-sidebar", {
+    t,
+    ecosystems,
+    activeSlug: "compare",
+  });
+
+  return renderShell({
+    locale,
+    title: t("meta.compare_title"),
+    description: t("meta.compare_description"),
+    url: `${SITE}/benchmarks/compare`,
+    content: `
+      <div class="bench-layout">
+        ${sidebar}
+        <div class="bench-layout__content">
+          ${compareContent}
+        </div>
+      </div>`,
+    t,
+    activeNav: "benchmarks",
+    extraHead: `<style>${BENCH_CSS}${COMPARE_CSS}</style>`,
+    extraBody: `<script type="module" src="/dist/benchmarks/compare.js"></script>`,
     mainClass: "",
   });
 }
@@ -229,9 +269,346 @@ export function renderBenchmarkPage(
   return new Response(html, htmlHeaders());
 }
 
+/**
+ * Render the compare page (/benchmarks/compare).
+ *
+ * @param req - HTTP request (for locale detection).
+ */
+export function renderComparePage(req: Request): Response {
+  const locale = detectLocale(req);
+  const cacheKey = `${locale}/__compare__`;
+
+  if (IS_PROD) {
+    const cached = pageCache.get(cacheKey);
+    if (cached !== undefined) {
+      return new Response(cached, htmlHeaders());
+    }
+  }
+
+  const html = assembleComparePage(locale);
+  pageCache.set(cacheKey, html);
+
+  return new Response(html, htmlHeaders());
+}
+
 // =============================================================================
 // Page-specific CSS
 // =============================================================================
+
+const COMPARE_CSS = `
+/* ── Compare: Library Selector ─────────────────────────────────────────── */
+.cmp-selector {
+  padding: 1rem 1.25rem;
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  margin-bottom: 1rem;
+}
+.cmp-selector__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+.cmp-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.cmp-slot {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.cmp-slot__label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  min-width: 64px;
+}
+.cmp-slot__controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+.cmp-slot__select {
+  flex: 1;
+  padding: 0.4rem 0.65rem;
+  border-radius: var(--radius);
+  background: var(--bg);
+  border: 1px solid var(--border-subtle);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+  transition: border-color var(--transition);
+  max-width: 340px;
+}
+.cmp-slot__select:hover {
+  border-color: var(--border);
+}
+.cmp-slot__select:focus {
+  border-color: var(--accent);
+}
+.cmp-slot__remove {
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  cursor: pointer;
+  font-family: inherit;
+  transition: color var(--transition), border-color var(--transition), background var(--transition);
+  line-height: 1;
+}
+.cmp-slot__remove:hover {
+  color: var(--red);
+  border-color: var(--red);
+  background: var(--red-dim);
+}
+.cmp-add-slot-btn {
+  padding: 0.3rem 0.75rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: color var(--transition), border-color var(--transition), background var(--transition);
+}
+.cmp-add-slot-btn:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--border);
+  background: var(--bg-hover);
+}
+.cmp-add-slot-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ── Compare: Status & Progress ─────────────────────────────────────────── */
+.cmp-status {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  padding: 0.4rem 0;
+  min-height: 1.4rem;
+}
+.cmp-status--running {
+  color: var(--accent);
+}
+.cmp-progress {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--bg-surface);
+  margin-bottom: 1.25rem;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+.cmp-progress--active {
+  opacity: 1;
+}
+.cmp-progress__bar {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+  transition: width 250ms ease;
+  width: 0%;
+}
+
+/* ── Compare: Results Table ─────────────────────────────────────────────── */
+.cmp-results {
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  overflow: hidden;
+  margin-top: 1.5rem;
+}
+.cmp-results__header {
+  display: flex;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+}
+.cmp-results__metric-label-col {
+  width: 110px;
+  flex-shrink: 0;
+  padding: 0.75rem 1rem;
+}
+.cmp-results__col-header {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border-left: 1px solid var(--border-subtle);
+  min-width: 0;
+}
+.cmp-results__lib-name {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cmp-results__lib-status {
+  font-size: 0.7rem;
+  margin-top: 0.2rem;
+  color: var(--text-muted);
+  min-height: 1rem;
+}
+.cmp-results__lib-status--wins {
+  color: var(--green);
+  font-weight: 600;
+}
+.cmp-results__lib-status--error {
+  color: var(--red);
+}
+.cmp-results__lib-status--pending {
+  color: var(--text-muted);
+  font-style: italic;
+}
+.cmp-results__body {
+  display: flex;
+  flex-direction: column;
+}
+.cmp-results__row {
+  display: flex;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.cmp-results__row:last-child {
+  border-bottom: none;
+}
+.cmp-results__metric-label {
+  width: 110px;
+  flex-shrink: 0;
+  padding: 0.75rem 1rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  background: var(--bg-elevated);
+  border-right: 1px solid var(--border-subtle);
+}
+.cmp-results__cell {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border-left: 1px solid var(--border-subtle);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  transition: background var(--transition);
+}
+.cmp-results__cell--winner {
+  background: rgba(74, 222, 128, 0.04);
+}
+.cmp-results__cell--error,
+.cmp-results__cell--empty,
+.cmp-results__cell--pending {
+  color: var(--text-muted);
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+}
+.cmp-results__cell--pending {
+  font-style: italic;
+}
+.cmp-cell__value {
+  font-size: 1.35rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  line-height: 1.2;
+}
+.cmp-cell__unit {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-left: 0.15rem;
+}
+.cmp-cell__meta {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+.cmp-results__cell--good .cmp-cell__value { color: var(--green); }
+.cmp-results__cell--ok   .cmp-cell__value { color: var(--yellow); }
+.cmp-results__cell--bad  .cmp-cell__value { color: var(--red); }
+
+/* ── Compare: Diff Badges ────────────────────────────────────────────────── */
+.cmp-diff-badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.1rem 0.45rem;
+  border-radius: 100px;
+  letter-spacing: 0.01em;
+  width: fit-content;
+}
+.cmp-diff-badge--winner {
+  background: var(--green-dim);
+  color: var(--green);
+}
+.cmp-diff-badge--tie {
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+}
+.cmp-diff-badge--worse {
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+}
+
+/* ── Compare: Footer note ────────────────────────────────────────────────── */
+.cmp-results__footer {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+}
+.cmp-results__footer-note {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+/* ── Compare: Responsive ─────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .cmp-slot {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+  }
+  .cmp-slot__label {
+    min-width: unset;
+  }
+  .cmp-slot__select {
+    max-width: 100%;
+  }
+  .cmp-results__metric-label-col,
+  .cmp-results__metric-label {
+    width: 80px;
+    font-size: 0.65rem;
+    padding: 0.6rem 0.6rem;
+  }
+  .cmp-results__col-header,
+  .cmp-results__cell {
+    padding: 0.6rem 0.6rem;
+  }
+  .cmp-results__lib-name {
+    font-size: 0.78rem;
+  }
+  .cmp-cell__value {
+    font-size: 1.1rem;
+  }
+}
+`.trim();
 
 const BENCH_CSS = `
 /* ── Layout ─────────────────────────────────────────────────────────────── */

@@ -3,7 +3,9 @@
     "overview_title": "Benchmarks — virtuallist.io",
     "overview_description": "Live performance benchmarks for virtual list libraries. Compare render time, memory usage, scroll FPS, and P95 frame time across React, Vue, SolidJS, Svelte, and Vanilla JS implementations.",
     "library_title": "{name} Benchmark — virtuallist.io",
-    "library_description": "Live performance benchmark for {name}. Measure render time, memory usage, scroll FPS, and P95 frame time with {npm} in your browser."
+    "library_description": "Live performance benchmark for {name}. Measure render time, memory usage, scroll FPS, and P95 frame time with {npm} in your browser.",
+    "compare_title": "Compare Libraries — virtuallist.io",
+    "compare_description": "Compare virtual list libraries head-to-head in your browser. Run any combination of React, Vue, SolidJS, Svelte, and Vanilla JS implementations under identical test conditions."
   },
   "overview": {
     "title": "Benchmarks",
@@ -13,7 +15,13 @@
     "methodology_link": "Read the full methodology →"
   },
   "sidebar": {
-    "overview_link": "Overview"
+    "overview_link": "Overview",
+    "compare_link": "⚖ Compare"
+  },
+  "controls": {
+    "items_label": "Items",
+    "stress_label": "Stress",
+    "run": "▶ Run"
   },
   "viewport_label": "Live Preview"
 }

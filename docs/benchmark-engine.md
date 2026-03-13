@@ -357,6 +357,44 @@ When `memoryUsed` is null (non-Chrome browser), the Memory metric is emitted wit
 
 ---
 
+## Winner Detection (`pickWinner`)
+
+`pickWinner(entries, better)` is the single source of truth for determining which library wins a given metric in a multi-library comparison. It is used by `compare.js` — nothing else in the codebase duplicates this logic.
+
+```js
+pickWinner(
+  [{ slug: "react-window", value: 12 }, { slug: "virtua", value: 9 }],
+  "lower"
+)
+// → "virtua"
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `entries` | `Array<{ slug: string, value: number }>` | One entry per library for this metric |
+| `better` | `'lower' \| 'higher'` | The direction for this metric |
+
+**Return value:**
+
+| Result | Meaning |
+|--------|---------|
+| `string` (a slug) | That library won clearly (difference > 3%) |
+| `"__tie__"` | All valid values are within 3% of each other |
+| `null` | Fewer than 2 valid (non-zero, non-null) values |
+
+**Algorithm:**
+1. Filter out entries where `value` is null, undefined, or 0
+2. If fewer than 2 valid entries remain, return `null`
+3. Compute `max` and `min` of all valid values
+4. If `(max − min) / max < 0.03`, return `"__tie__"` (all within 3%)
+5. Otherwise find the best entry (`min` for `"lower"`, `max` for `"higher"`) and return its `slug`
+
+The 3% tie threshold prevents noisy micro-differences from being reported as meaningful wins. It matches the threshold used in vlist.dev's comparison benchmarks.
+
+---
+
 ## Runner
 
 `runBenchmarks(options)` is the top-level function called by `script.js`. It orchestrates a run across one or more item counts for a single library.

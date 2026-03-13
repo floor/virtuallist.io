@@ -33,6 +33,7 @@ virtuallist.io/
 ├── benchmarks/
 │   ├── runner.js                 # Core measurement engine (browser, ESM)
 │   ├── script.js                 # Browser entry point — wires UI and runner
+│   ├── compare.js                # Compare page entry point — multi-library head-to-head
 │   ├── build.ts                  # Bun bundler build script
 │   └── libraries/
 │       ├── _TEMPLATE.js          # Template for new adapters
@@ -60,8 +61,9 @@ virtuallist.io/
 ├── dist/                         # Build output — gitignored
 │   └── benchmarks/
 │       ├── runner.js
-│       ├── script.js             # ~1.5 MB minified
-│       └── styles.css
+│       ├── script.js             # ~1.5 MB minified (all adapters + frameworks)
+│       ├── compare.js            # ~1.5 MB minified (same adapters, compare UI)
+│       └── styles.css            # vlist.css + any local overrides, minified
 │
 ├── test/                         # Bun test files
 └── docs/                         # This documentation
@@ -99,6 +101,7 @@ handleRequest(req)
   ├── resolveHomepage()       →  /
   │
   ├── resolveBenchmarks()     →  /benchmarks
+  │                              /benchmarks/compare
   │                              /benchmarks/{slug}
   │
   ├── resolveMethodology()    →  /methodology
@@ -126,6 +129,7 @@ Each resolver returns a `Response` or `null`. The first non-null response wins. 
 |-----|------|-----------|
 | `/` | Homepage | none |
 | `/benchmarks` | Benchmark overview | none |
+| `/benchmarks/compare` | Multi-library head-to-head comparison | `compare.js` |
 | `/benchmarks/{slug}` | Individual library benchmark | `script.js` |
 | `/methodology` | Methodology documentation | none |
 | `/about` | About | none |
@@ -144,7 +148,7 @@ The project has two completely separate JS environments that never share code at
 
 **Server** — TypeScript, runs in Bun, handles HTTP. Lives in `src/`. Has access to the filesystem and SQLite. Never imported by the browser.
 
-**Browser (benchmark engine)** — Plain JavaScript ESM, runs in the visitor's browser. Lives in `benchmarks/`. Built by the Bun bundler into `dist/benchmarks/script.js`. Has access to the DOM and browser APIs. Never imported by Bun.
+**Browser (benchmark engine)** — Plain JavaScript ESM, runs in the visitor's browser. Lives in `benchmarks/`. Built by the Bun bundler into `dist/benchmarks/script.js` (individual library pages) and `dist/benchmarks/compare.js` (compare page). Has access to the DOM and browser APIs. Never imported by Bun.
 
 The only connection between them is the `/api/benchmarks` HTTP endpoint: the browser engine POSTs results there, and the server stores them.
 
@@ -165,7 +169,7 @@ renderSomePage()
 
 `renderShell()` provides the consistent outer document: `<head>` with meta tags and critical CSS, sticky navigation header, `<main>` with the content, and footer.
 
-Individual library benchmark pages are the only pages that load JavaScript. The `<script type="module" src="/dist/benchmarks/script.js">` tag is injected via `extraBody` exclusively on `/benchmarks/{slug}` pages. Every other page — homepage, overview, methodology, about — ships zero JavaScript.
+Only benchmark pages load JavaScript. The `<script type="module" src="/dist/benchmarks/script.js">` tag is injected via `extraBody` on `/benchmarks/{slug}` pages. The compare page at `/benchmarks/compare` loads `compare.js` instead. Every other page — homepage, overview, methodology, about — ships zero JavaScript.
 
 ---
 
@@ -184,6 +188,22 @@ User clicks Run
           Phase 3: Scroll   — 7 speed levels × 2s each, FPS + P95 frame time
   → calls onResult(result) → renders metric cards in the DOM
   → calls persistResult()  → POST /api/benchmarks (fire-and-forget)
+```
+
+When a visitor opens `/benchmarks/compare` and clicks Run Comparison:
+
+```
+User selects 2–4 libraries, clicks Run Comparison
+  → compare.js collects selected slugs, shuffles execution order
+      (randomised to eliminate JIT warmth / GC bleed-through bias)
+  → for each library in shuffled order:
+      → benchmarkLibrary({ create, destroy, ... })   ← same pipeline as above
+      → stores raw results keyed by slug
+      → GC barrier between each library
+  → renderResults() in original slot order
+      → pickWinner(entries, better) per metric   ← single source of truth in runner.js
+      → metric × library table with ✓ best / ≈ tie / N% worse badges
+      → win count totals in each column header
 ```
 
 See [benchmark-engine.md](./benchmark-engine.md) for the full measurement pipeline.

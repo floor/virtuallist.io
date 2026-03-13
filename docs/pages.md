@@ -6,6 +6,21 @@ Page-specific CSS is passed via the `extraHead` slot as an inline `<style>` bloc
 
 ---
 
+## Pages at a Glance
+
+| URL | Renderer | JavaScript |
+|-----|----------|-----------|
+| `/` | `home.ts` | none |
+| `/benchmarks` | `benchmarks.ts` → `assembleOverviewPage()` | none |
+| `/benchmarks/compare` | `benchmarks.ts` → `assembleComparePage()` | `compare.js` |
+| `/benchmarks/{slug}` | `benchmarks.ts` → `assembleLibraryPage()` | `script.js` |
+| `/methodology` | `methodology.ts` | none |
+| `/about` | `about.ts` | none |
+| `/about/api` | `about.ts` | none |
+| `/about/contribute` | `about.ts` | none |
+
+---
+
 ## Homepage (`src/server/pages/home.ts`)
 
 **URL:** `/`  
@@ -85,6 +100,88 @@ A `<div id="bench-viewport">` container with `height: 0` initially. During a run
 
 **`data-library` attribute**  
 The `.bench-page` wrapper element carries `data-library="{slug}"`. This is how `script.js` detects which library to benchmark when it initialises.
+
+---
+
+## Compare Page (`src/server/pages/benchmarks.ts` → `assembleComparePage()`)
+
+**URL:** `/benchmarks/compare`  
+**Active nav:** "Benchmarks"  
+**Sidebar active link:** "⚖ Compare"  
+**JavaScript shipped:** `<script type="module" src="/dist/benchmarks/compare.js">` (injected via `extraBody`)
+
+The compare page lets a visitor pick 2–4 libraries and run them head-to-head under exactly the same conditions as an individual library benchmark. Results are displayed as a metric × library table with per-cell winner badges and difference percentages.
+
+### Library Selector
+
+A surface card above the controls containing:
+- A **"Libraries" label** and an **"+ Add library" button** (disabled and dimmed when 4 slots are already open)
+- **Slot rows** — each slot has a `<select>` dropdown listing all registered libraries, a slot label ("Library 1", "Library 2", …), and a remove button (✕) that appears when more than 2 slots are present
+
+Slots are rendered and wired by `compare.js`. When a duplicate library is selected across any two slots, the Run button is disabled and a warning message appears: "Please select a different library for each slot."
+
+### Controls
+
+Identical to the individual library page: item count segmented group (10K / 100K / 1M), stress level segmented group (0 / 3 / 5 / 7 ms), and a "▶ Run Comparison" button that becomes "■ Stop" during a run. All controls are disabled while a run is in progress.
+
+### Status bar and progress
+
+A `<div id="cmp-status">` text line shows the current phase ("Running React Window (1/3)…", "✅ Complete", etc.). A slim 3px progress bar below it fills as each library's sub-phases complete. Progress is derived by `parseLocalProgress()` in `compare.js`, which maps the same status message patterns used by `script.js` (render N/5, memory N/10, scroll N/7) into a fine-grained position within each library's equal slice of the bar (0–90%), with the final 10% reserved for result rendering.
+
+### Execution order
+
+When Run is clicked, `compare.js` shuffles the selected slugs with `[...slugs].sort(() => Math.random() - 0.5)` before running. This randomises which library runs cold and which runs warm, eliminating JIT warmth and GC bleed-through bias. A GC barrier (`tryGC()` + `waitFrames(5)`) is placed between each library run. Results are always rendered in the original slot order so the columns match what the user selected.
+
+### Results table
+
+Populated by `compare.js` once all libraries have run. Structure:
+
+**Header row** — one column per library. Each column shows:
+- The library name in bold
+- A status sub-line: green "N wins" when the library won at least one metric, red "Failed" if the run threw an error, italic "Not run" if the run was aborted before this library ran
+
+**Metric rows** — one row per core metric (Render, Memory, Scroll FPS, P95 Frame). Each row has:
+- A left label column with the metric name in uppercase
+- One value cell per library, containing:
+  - The numeric value and unit in large bold type, coloured green/yellow/red based on the absolute rating thresholds from `buildMetrics()`
+  - A diff badge: `✓ best` (green) for the winner, `≈ tie` (muted) when all values are within 3% of each other, or `N% worse` (muted) relative to the winner for non-winners
+
+**Footer** — a one-line note: "Libraries ran in randomized order to reduce GC bleed-through and JIT warmth bias."
+
+### Winner detection
+
+Winner detection uses `pickWinner(entries, better)` exported from `runner.js` — the single source of truth. It accepts an array of `{ slug, value }` pairs and a `'lower' | 'higher'` direction, filters out zero/null values, and returns the winning slug, `"__tie__"` if all valid values are within 3% of each other, or `null` if fewer than 2 valid values exist. The same function and threshold are used for the per-cell diff badge calculation.
+
+### Three cell states for aborted runs
+
+If a run is aborted mid-way, libraries that never ran are absent from the `allMetrics` Map (distinguished from `null` which means "ran but failed"). The table handles three distinct states:
+
+| State | How it arises | Cell rendering |
+|-------|--------------|----------------|
+| Absent (`!allMetrics.has(slug)`) | Run aborted before this library's turn | `—` with `.cmp-results__cell--pending` (italic) |
+| `null` | Library ran but threw an error | `—` with `.cmp-results__cell--error` |
+| `BenchmarkMetric[]` | Library ran successfully | Value, unit, diff badge |
+
+### Live preview viewport
+
+Same as the individual library page — a `<div id="cmp-viewport">` that expands to 400px during the run and collapses when complete. Each library renders into a fresh sub-container inside this viewport; the previous library's DOM is cleared before the next one mounts.
+
+### CSS
+
+The compare page uses `BENCH_CSS` (shared with all benchmark pages) plus `COMPARE_CSS`, both defined as string constants in `src/server/pages/benchmarks.ts` and injected via `extraHead`. `COMPARE_CSS` covers:
+
+| Class prefix | What it covers |
+|---|---|
+| `.cmp-selector`, `.cmp-slots`, `.cmp-slot` | Library picker card and slot rows |
+| `.cmp-slot__select`, `.cmp-slot__remove` | Dropdown and remove button |
+| `.cmp-add-slot-btn` | Add library button |
+| `.cmp-status`, `.cmp-progress` | Status text and progress bar |
+| `.cmp-results`, `.cmp-results__header`, `.cmp-results__body`, `.cmp-results__row` | Results table structure |
+| `.cmp-results__col-header`, `.cmp-results__lib-name`, `.cmp-results__lib-status` | Column header content |
+| `.cmp-results__metric-label`, `.cmp-results__cell` | Row label and value cells |
+| `.cmp-diff-badge--winner`, `.cmp-diff-badge--tie`, `.cmp-diff-badge--worse` | Diff badge variants |
+| `.cmp-cell__value`, `.cmp-cell__unit`, `.cmp-cell__meta` | Cell value typography |
+| `.cmp-results__footer` | Footer note |
 
 ---
 

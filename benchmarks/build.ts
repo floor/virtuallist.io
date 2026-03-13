@@ -6,12 +6,7 @@
 //   bun run benchmarks/build.ts
 //   bun run benchmarks/build.ts --watch
 
-import {
-  existsSync,
-  readFileSync,
-  writeFileSync,
-  watch,
-} from "fs";
+import { existsSync, readFileSync, writeFileSync, watch } from "fs";
 import { join } from "path";
 
 const isWatch = process.argv.includes("--watch");
@@ -135,9 +130,7 @@ function formatKB(bytes: number): string {
 function gzipSize(filePath: string): number {
   try {
     const file = Bun.file(filePath);
-    const content = new Uint8Array(
-      require("fs").readFileSync(filePath)
-    );
+    const content = new Uint8Array(require("fs").readFileSync(filePath));
     // Use Bun's built-in gzip via DecompressionStream to estimate size
     // Fallback to raw size if not available
     return Math.round(file.size * 0.3); // rough estimate
@@ -165,10 +158,16 @@ async function build(): Promise<void> {
   ensureDir(OUT_DIR);
 
   const entrypoint = join(BENCHMARKS_DIR, "script.js");
+  const compareEntrypoint = join(BENCHMARKS_DIR, "compare.js");
   const runnerPath = join(BENCHMARKS_DIR, "runner.js");
 
   if (!existsSync(entrypoint)) {
     console.error("❌ benchmarks/script.js not found");
+    process.exit(1);
+  }
+
+  if (!existsSync(compareEntrypoint)) {
+    console.error("❌ benchmarks/compare.js not found");
     process.exit(1);
   }
 
@@ -220,26 +219,87 @@ async function build(): Promise<void> {
     }
     console.log("  ✅ script.js");
 
-    // ── Collect CSS from page renderers (inlined) and any external CSS ──
-    // Note: CSS is currently inlined in the TypeScript renderers.
-    // If a standalone benchmarks/styles.css exists, bundle it too.
+    // ── Build compare.js (compare page entry point) ─────────────────────
+    console.log("  Building compare.js...");
+    const compareResult = await Bun.build({
+      entrypoints: [compareEntrypoint],
+      outdir: OUT_DIR,
+      ...buildOptions(),
+      plugins: [frameworkDedupePlugin],
+      define,
+    });
+
+    if (!compareResult.success) {
+      const errors = compareResult.logs.map((log) => log.message).join("\n");
+      console.error("❌ Compare build failed:\n", errors);
+      console.error("\nBuild logs:");
+      compareResult.logs.forEach((log) => {
+        console.error(`  ${log.level}: ${log.message}`);
+      });
+      process.exit(1);
+    }
+    console.log("  ✅ compare.js");
+
+    // ── Collect CSS ─────────────────────────────────────────────────────
+    // Bundle required stylesheets from library packages, then any local
+    // overrides. Order matters — later rules win on conflicts.
+    const cssParts: string[] = [];
+
+    // Libraries that require their own CSS to render correctly
+    const libCssPaths: Array<{ path: string; label: string }> = [
+      {
+        path: join(".", "node_modules", "@floor", "vlist", "dist", "vlist.css"),
+        label: "@floor/vlist",
+      },
+      {
+        path: join(
+          ".",
+          "node_modules",
+          "vue-virtual-scroller",
+          "dist",
+          "vue-virtual-scroller.css",
+        ),
+        label: "vue-virtual-scroller",
+      },
+      {
+        path: join(".", "node_modules", "clusterize.js", "clusterize.css"),
+        label: "clusterize.js",
+      },
+    ];
+
+    for (const { path, label } of libCssPaths) {
+      if (existsSync(path)) {
+        cssParts.push(readFileSync(path, "utf-8"));
+        console.log(`  ✅ ${label} CSS (bundled)`);
+      } else {
+        console.warn(`  ⚠️  ${label} CSS not found at ${path}`);
+      }
+    }
+
     const cssPath = join(BENCHMARKS_DIR, "styles.css");
     if (existsSync(cssPath)) {
-      const raw = readFileSync(cssPath, "utf-8");
-      const minified = minifyCss(raw);
-      const cssOutPath = join(OUT_DIR, "styles.css");
+      cssParts.push(readFileSync(cssPath, "utf-8"));
+    }
+
+    const cssOutPath = join(OUT_DIR, "styles.css");
+    if (cssParts.length > 0) {
+      const minified = minifyCss(cssParts.join("\n"));
       writeFileSync(cssOutPath, minified);
-      console.log(`  ✅ styles.css (${formatKB(Buffer.byteLength(minified, "utf-8"))} KB)`);
+      console.log(
+        `  ✅ styles.css (${formatKB(Buffer.byteLength(minified, "utf-8"))} KB)`,
+      );
     } else {
-      // Write an empty styles.css placeholder so the link tag doesn't 404
-      writeFileSync(join(OUT_DIR, "styles.css"), "/* virtuallist.io benchmark styles */");
+      // Write a placeholder so the <link> tag doesn't 404
+      writeFileSync(cssOutPath, "/* virtuallist.io benchmark styles */");
     }
 
     // ── Report bundle sizes ─────────────────────────────────────────────
     const jsPath = join(OUT_DIR, "script.js");
+    const compareOutPath = join(OUT_DIR, "compare.js");
     const runnerOutPath = join(OUT_DIR, "runner.js");
 
     const jsSize = Bun.file(jsPath).size;
+    const compareSize = Bun.file(compareOutPath).size;
     const runnerSize = Bun.file(runnerOutPath).size;
 
     const elapsed = (performance.now() - start).toFixed(0);
@@ -248,6 +308,7 @@ async function build(): Promise<void> {
   ✅ Build complete in ${elapsed}ms
 
   script.js   ${formatKB(jsSize)} KB
+  compare.js  ${formatKB(compareSize)} KB
   runner.js   ${formatKB(runnerSize)} KB
   Output:     ${OUT_DIR}/
     `);

@@ -11,7 +11,7 @@ Four things need to happen:
 1. Register the library in `src/server/registry.ts`
 2. Install the npm package
 3. Create a benchmark adapter in `benchmarks/libraries/{slug}.js`
-4. Import the adapter in `benchmarks/script.js`
+4. Import the adapter in **both** `benchmarks/script.js` and `benchmarks/compare.js`
 
 Then rebuild: `bun run build`.
 
@@ -424,7 +424,7 @@ defineLibrary({
 
 ## Step 4 — Import in script.js
 
-Open `benchmarks/script.js` and add an import at the top of the adapter import block:
+Open **both** `benchmarks/script.js` and `benchmarks/compare.js` and add an import in the adapter import block of each file:
 
 ```js
 // existing imports
@@ -436,7 +436,7 @@ import "./libraries/tanstack-virtual.js";
 import "./libraries/my-library.js";
 ```
 
-The import causes `defineLibrary()` to run at module evaluation time, registering the adapter with the engine before any benchmark starts.
+The import causes `defineLibrary()` to run at module evaluation time, registering the adapter with the engine before any benchmark starts. Both entry points must import every adapter — `script.js` serves the individual library benchmark pages, `compare.js` serves the `/benchmarks/compare` page, and both need the full adapter registry to function.
 
 ---
 
@@ -471,6 +471,8 @@ Before submitting a PR:
 - [ ] `DEFAULT_OVERSCAN = 5` is used (or `DEFAULT_OVERSCAN * ITEM_HEIGHT` for pixel-based overscan)
 - [ ] One of the four shared template helpers is used — no custom item template
 - [ ] `destroy()` leaves no orphan DOM nodes (inspect the benchmark container in DevTools after a run)
+- [ ] Library appears in the selector dropdowns on `http://localhost:3456/benchmarks/compare`
+- [ ] Selecting the library in a compare slot and clicking Run Comparison benchmarks it correctly
 
 ---
 

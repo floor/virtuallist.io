@@ -186,8 +186,16 @@ export const STRESS_LEVELS = [
  * Shared item data arrays — every library renders the exact same text content.
  */
 export const ITEM_NAMES = [
-  "Alice", "Bob", "Carol", "Dave", "Eve",
-  "Frank", "Grace", "Hank", "Iris", "Jack",
+  "Alice",
+  "Bob",
+  "Carol",
+  "Dave",
+  "Eve",
+  "Frank",
+  "Grace",
+  "Hank",
+  "Iris",
+  "Jack",
 ];
 
 export const ITEM_BADGES = ["Active", "New", "VIP", "Pro"];
@@ -547,7 +555,7 @@ export const findViewport = (container) => {
 
   // Strategy 1: Known class names used by popular libraries
   const knownSelectors = [
-    ".vlist-viewport",       // vlist
+    ".vlist-viewport", // vlist
     "[data-testid='virtuoso-scroller']", // react-virtuoso
   ];
 
@@ -670,9 +678,8 @@ export const measureScrollPerformance = async (
           [...frameTimes].sort((a, b) => a - b),
           95,
         );
-        const medianFPS = frameTimes.length > 0
-          ? round(1000 / medianFrameTime, 1)
-          : 0;
+        const medianFPS =
+          frameTimes.length > 0 ? round(1000 / medianFrameTime, 1) : 0;
 
         resolve({
           medianFPS,
@@ -831,7 +838,9 @@ export const benchmarkLibrary = async ({
   container.style.visibility = "hidden";
 
   for (let i = 0; i < MEASURE_ITERATIONS; i++) {
-    onStatus(`Measuring ${libraryName} render (${i + 1}/${MEASURE_ITERATIONS})...`);
+    onStatus(
+      `Measuring ${libraryName} render (${i + 1}/${MEASURE_ITERATIONS})...`,
+    );
 
     container.innerHTML = "";
     await tryGC();
@@ -1082,7 +1091,9 @@ export const runBenchmarks = async (options) => {
 
   const adapter = libraries.get(librarySlug);
   if (!adapter) {
-    throw new Error(`Library "${librarySlug}" is not registered. Did you import its adapter?`);
+    throw new Error(
+      `Library "${librarySlug}" is not registered. Did you import its adapter?`,
+    );
   }
 
   /** @type {BenchmarkResult[]} */
@@ -1311,4 +1322,41 @@ export const escapeHtml = (str) => {
   const div = document.createElement("div");
   div.textContent = str;
   return div.innerHTML;
+};
+
+// =============================================================================
+// Comparison: winner detection shared by compare.js
+// =============================================================================
+
+/**
+ * Determine the winner slug among a set of {slug, value} pairs for one metric.
+ *
+ * Returns:
+ *   - the winning slug  when one library is clearly better (> TIE_THRESHOLD apart)
+ *   - "__tie__"         when all values are within TIE_THRESHOLD of each other
+ *   - null              when there are fewer than 2 valid values
+ *
+ * @param {Array<{slug: string, value: number}>} entries
+ * @param {'lower'|'higher'} better
+ * @returns {string|null}
+ */
+export const pickWinner = (entries, better) => {
+  // Filter out zero / null values
+  const valid = entries.filter((e) => e.value !== null && e.value > 0);
+  if (valid.length < 2) return null;
+
+  const values = valid.map((e) => e.value);
+  const max = Math.max(...values);
+  const min = Math.min(...values);
+  const base = Math.max(Math.abs(max), Math.abs(min)) || 1;
+
+  // All within 3 % → tie
+  if ((max - min) / base < 0.03) return "__tie__";
+
+  const best =
+    better === "lower"
+      ? valid.reduce((a, b) => (b.value < a.value ? b : a))
+      : valid.reduce((a, b) => (b.value > a.value ? b : a));
+
+  return best.slug;
 };

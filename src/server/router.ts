@@ -14,7 +14,7 @@
 
 import { routeApi } from "../api/router";
 import { renderHomepage } from "./pages/home";
-import { renderBenchmarkPage } from "./pages/benchmarks";
+import { renderBenchmarkPage, renderComparePage } from "./pages/benchmarks";
 import { renderMethodologyPage } from "./pages/methodology";
 import { renderAboutPage } from "./pages/about";
 import { resolveStatic } from "./static";
@@ -59,6 +59,14 @@ function resolveBenchmarks(pathname: string, req: Request): Response | null {
   // Overview page
   if (pathname === "/benchmarks" || pathname === "/benchmarks/") {
     return renderBenchmarkPage(null, req);
+  }
+
+  // Compare page: /benchmarks/compare
+  if (
+    pathname === "/benchmarks/compare" ||
+    pathname === "/benchmarks/compare/"
+  ) {
+    return renderComparePage(req);
   }
 
   // Individual benchmark: /benchmarks/{library-slug}

@@ -2,6 +2,15 @@
 
 Each library benchmark adapter is a single JavaScript file in `benchmarks/libraries/`. Adapters are the only place where library-specific code lives. The measurement engine (`runner.js`) knows nothing about any particular library — it only calls `create()` and `destroy()` from the adapter.
 
+Adapters are imported by **two** entry points:
+
+| Entry point | Purpose |
+|-------------|---------|
+| `benchmarks/script.js` | Individual library benchmark pages (`/benchmarks/{slug}`) |
+| `benchmarks/compare.js` | Multi-library compare page (`/benchmarks/compare`) |
+
+Both files import every adapter. Adding a new adapter requires an import line in both files.
+
 ---
 
 ## Adapter Contract
@@ -221,7 +230,7 @@ Returns `{ clusterize, scrollArea, id }`. `destroy()` calls `clusterize.destroy(
 
 **Library:** @floor/vlist (Vanilla JS)
 
-Mounts the zero-dependency vanilla virtual list directly into the container using `vlist(container, { items, overscan, item: { height, template } })`. Uses `benchmarkTemplate` as the `item.template` function.
+Mounts the zero-dependency vanilla virtual list directly into the container using `vlist({ container, items, overscan, item: { height, template } }).build()`. Uses `benchmarkTemplate` as the `item.template` function.
 
 Returns the vlist instance. `destroy()` calls `instance.destroy()`.
 
@@ -231,7 +240,7 @@ Returns the vlist instance. `destroy()` calls `instance.destroy()`.
 
 **Library:** vlist-react
 
-React binding for the vlist core. Passes `benchmarkTemplate` as the `item.template` prop. Returns the React root. `destroy()` calls `root.unmount()`.
+React binding for the vlist core. Passes `benchmarkTemplate` as the `item.template` prop and sets `style={{ height, width: "100%" }}` on the `<VList>` component so it fills the benchmark container. Returns the React root. `destroy()` calls `root.unmount()`.
 
 ---
 
@@ -273,7 +282,7 @@ The complete step-by-step guide is in [adding-a-library.md](./adding-a-library.m
 1. Copy `benchmarks/libraries/_TEMPLATE.js` to `benchmarks/libraries/{slug}.js`
 2. Implement `loadDependencies()`, `create()`, and `destroy()`
 3. Use `ITEM_HEIGHT`, `DEFAULT_OVERSCAN`, and the shared template helpers
-4. Import the new file in `benchmarks/script.js`
+4. Import the new file in **both** `benchmarks/script.js` and `benchmarks/compare.js`
 5. Run `bun run build`
 
 The `_TEMPLATE.js` file is fully documented with inline comments and examples for both React and vanilla patterns.
@@ -293,7 +302,7 @@ The `_TEMPLATE.js` file is fully documented with inline comments and examples fo
 | `tanstack-solid-virtual` | ⚠️ Partial | Simplified render — not fully reactive |
 | `clusterize` | ✅ Implemented | Pre-generates all HTML upfront |
 | `vlist` | ✅ Implemented | |
-| `vlist-react` | ✅ Implemented | Needs validation of `style` prop API |
+| `vlist-react` | ✅ Implemented | |
 | `vlist-vue` | ✅ Implemented | |
-| `vlist-solidjs` | ✅ Implemented | Needs validation of component call API |
+| `vlist-solidjs` | ✅ Implemented | |
 | `vlist-svelte` | ⚠️ Partial | Depends on package export format |
