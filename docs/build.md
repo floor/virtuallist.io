@@ -63,8 +63,16 @@ The plugin intercepts `onResolve` calls for framework package names and forces t
 | `react`, `react-dom`, `react-dom/*` | `node_modules/react`, `node_modules/react-dom` |
 | `vue` | `node_modules/vue/dist/vue.esm-bundler.js` |
 | `@vue/*` | `node_modules/@vue/*` |
-| `solid-js`, `solid-js/*` | `node_modules/solid-js` |
+| `solid-js` | `node_modules/solid-js/dist/solid.js` (browser build) |
+| `solid-js/web` | `node_modules/solid-js/web/dist/web.js` (browser build) |
+| `solid-js/store` | `node_modules/solid-js/store/dist/store.js` (browser build) |
 | `@floor/vlist`, `@floor/vlist/*` | `node_modules/@floor/vlist` |
+
+### Why SolidJS uses explicit browser builds
+
+SolidJS's `package.json` exports use conditional exports where the `node`, `main`, and `module` entries all point to `dist/server.js` — the SSR bundle. Since `require.resolve()` runs in Bun/Node context, it picks the server entry by default. The server bundle throws "Client-only API called on the server side" when browser APIs like `render()` are called.
+
+The plugin explicitly maps each `solid-js` sub-path to its browser bundle (`dist/solid.js`, `web/dist/web.js`, `store/dist/store.js`). The `solid-js/store` mapping is required because `@tanstack/solid-virtual` imports it internally for its reactive virtualizer state.
 
 ### Why Vue uses `vue.esm-bundler.js`
 
@@ -131,7 +139,7 @@ These are passed to `Bun.build()` via the `define` option. Without `__VUE_OPTION
 
 ## Bundle Size
 
-Both `script.js` and `compare.js` are approximately 1.5 MB minified. They share the same adapter imports and framework runtimes — React 19, ReactDOM 19, Vue 3 (runtime + compiler), SolidJS 1.9 — so the size is nearly identical. The difference is only the page-specific UI code (a few KB).
+Both `script.js` and `compare.js` are approximately 1.4 MB minified. They share the same adapter imports and framework runtimes — React 19, ReactDOM 19, Vue 3 (runtime + compiler), SolidJS 1.9 — so the size is nearly identical. The difference is only the page-specific UI code (a few KB).
 
 `results.js` is approximately 2 KB minified. It contains no framework code — only vanilla JS for DOM manipulation (filter buttons and table sorting). This is intentional: the results page is server-rendered from the database, so the client-side script only adds interactivity to the already-rendered HTML.
 
@@ -142,7 +150,7 @@ This was a deliberate tradeoff:
 - Splitting per-library would require multiple script tags and coordination logic
 - A single cached script.js is fast on repeat visits
 
-**Implication for visitors:** The first page load on any individual library benchmark page downloads ~1.5 MB. Subsequent visits to any benchmark page use the cached bundle.
+**Implication for visitors:** The first page load on any individual library benchmark page downloads ~1.4 MB. Subsequent visits to any benchmark page use the cached bundle.
 
 ---
 
