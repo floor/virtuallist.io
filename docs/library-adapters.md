@@ -1,0 +1,299 @@
+# Library Adapters
+
+Each library benchmark adapter is a single JavaScript file in `benchmarks/libraries/`. Adapters are the only place where library-specific code lives. The measurement engine (`runner.js`) knows nothing about any particular library — it only calls `create()` and `destroy()` from the adapter.
+
+---
+
+## Adapter Contract
+
+Every adapter must call `defineLibrary(adapter)` exactly once when the module is imported. The adapter object must implement:
+
+```js
+defineLibrary({
+  slug: string,       // must match the slug in src/server/registry.ts exactly
+  name: string,       // display name
+  ecosystem: string,  // "react" | "vue" | "solid" | "svelte" | "vanilla"
+
+  async create(container, itemCount) {
+    // Mount the library's virtual list into container.
+    // Return an instance handle — anything that destroy() can use to clean up.
+  },
+
+  async destroy(instance) {
+    // Unmount the library completely.
+    // Remove all DOM elements, cancel all timers, release all references.
+    // Must not throw if instance is null or undefined.
+  },
+})
+```
+
+### Fairness requirements
+
+All adapters must follow these rules to ensure the benchmarks are comparable:
+
+| Requirement | Value | Reason |
+|-------------|-------|--------|
+| Item height | `ITEM_HEIGHT` (48 px) | All libraries must render rows of the same height |
+| Overscan | `DEFAULT_OVERSCAN` (5) | Equal off-screen rendering for all libraries that support it |
+| DOM template | Shared helper (see below) | All libraries must render the same 7-element structure per item |
+| Container height | `container.clientHeight \|\| 600` | All libraries get the same viewport size |
+| `destroy()` cleanup | Complete | Leftover DOM or event listeners contaminate the next measurement |
+
+### Shared DOM template helpers
+
+The runner exports four helpers. Use the one that matches the library's rendering model:
+
+| Helper | Output | Use for |
+|--------|--------|---------|
+| `benchmarkTemplate(_item, index)` | HTML string (inner content, no outer div) | Libraries with an HTML template callback |
+| `createRealisticReactChildren(React, index)` | `React.ReactElement[]` | All React-based libraries |
+| `populateRealisticDOMChildren(el, index)` | Mutates an existing DOM element | SolidJS, vanilla DOM manipulation |
+| `generateRealisticItemHTML(index, height)` | Complete `<div class="bench-item">` HTML string | Libraries that need pre-built HTML strings (e.g. Clusterize.js) |
+
+---
+
+## Lazy Loading
+
+All adapters use dynamic `import()` inside a `loadDependencies()` function. Module-level variables cache the loaded exports so `loadDependencies()` is a no-op on subsequent calls.
+
+```js
+let MyComponent
+
+const loadDependencies = async () => {
+  try {
+    if (!MyComponent) {
+      const mod = await import("my-library")
+      MyComponent = mod.VirtualList
+    }
+    return true
+  } catch (err) {
+    console.error("[my-library] Failed to load:", err)
+    return false
+  }
+}
+```
+
+`create()` always calls `loadDependencies()` first and throws if it returns `false`:
+
+```js
+create: async (container, itemCount) => {
+  const loaded = await loadDependencies()
+  if (!loaded) throw new Error("my-library is not available")
+  // … mount the list
+}
+```
+
+### React `createRoot` CJS fallback
+
+Bun's bundler wraps CommonJS modules via `__toESM`. On Firefox, the resulting getter-based proxy can lose `createRoot` from `react-dom/client`. All React adapters apply this fallback:
+
+```js
+const ReactDOMClient = await import("react-dom/client")
+ReactDOM = ReactDOMClient.createRoot
+  ? ReactDOMClient
+  : (ReactDOMClient.default ?? ReactDOMClient)
+```
+
+---
+
+## Current Adapters
+
+### `react-window.js`
+
+**Library:** react-window  
+**Component:** `FixedSizeList`
+
+Mounts a `FixedSizeList` with `height`, `itemCount`, `itemSize: ITEM_HEIGHT`, and `overscanCount: DEFAULT_OVERSCAN`. Each row is a `Row` component that renders the shared React children template. Returns the React root from `ReactDOM.createRoot()`.
+
+`destroy()` calls `root.unmount()`.
+
+---
+
+### `tanstack-virtual.js`
+
+**Library:** @tanstack/react-virtual  
+**Hook:** `useVirtualizer`
+
+TanStack Virtual requires a ref to the scroll container element. On Firefox, `useRef` is not populated before the first render cycle, causing `getScrollElement()` to return `null` and the virtualizer to crash. The adapter works around this using a **callback ref + `useState`** pattern:
+
+```js
+const [scrollEl, setScrollEl] = React.useState(null)
+const refCallback = React.useCallback((node) => {
+  parentRef.current = node
+  setScrollEl(node)  // triggers re-render with the real element
+}, [])
+```
+
+The virtualizer uses `getScrollElement: () => scrollEl` and renders an empty shell on the first pass (while `scrollEl` is null), then re-renders once the ref fires.
+
+`destroy()` calls `root.unmount()`.
+
+---
+
+### `react-virtuoso.js`
+
+**Library:** react-virtuoso  
+**Component:** `Virtuoso`
+
+Mounts a `Virtuoso` component with `totalCount`, `fixedItemHeight: ITEM_HEIGHT`, and `overscan: DEFAULT_OVERSCAN * ITEM_HEIGHT` (Virtuoso's `overscan` prop is in pixels, not item count). Each item is rendered by the `itemContent` prop using the shared React children template.
+
+`destroy()` calls `root.unmount()`.
+
+---
+
+### `virtua.js`
+
+**Library:** virtua  
+**Component:** `VList`
+
+Virtua's `<VList>` accepts React children directly rather than a render prop. The adapter pre-builds an array of `itemCount` React elements before mounting:
+
+```js
+const children = []
+for (let i = 0; i < itemCount; i++) {
+  children.push(React.createElement("div", { key: i, className: "bench-item", style: { height: ITEM_HEIGHT } },
+    ...createRealisticReactChildren(React, i)
+  ))
+}
+```
+
+For large item counts (100K, 1M) this pre-build step is itself measurable time. This is by design — the initial render time includes all work required to display the list, including any data preparation the library requires.
+
+`destroy()` calls `root.unmount()`.
+
+---
+
+### `legend-list.js`
+
+**Library:** @legendapp/list  
+**Component:** `LegendList`
+
+Uses a `data` array with `renderItem` and `keyExtractor` props. `drawDistance` (the overscan equivalent) is set to `DEFAULT_OVERSCAN * ITEM_HEIGHT` pixels. `recycleItems: true` enables Legend List's item recycling mode.
+
+`destroy()` calls `root.unmount()`.
+
+---
+
+### `vue-virtual-scroller.js`
+
+**Library:** vue-virtual-scroller  
+**Component:** `RecycleScroller`
+
+Creates a wrapper `<div>` with fixed height and mounts a Vue 3 app into it. The app uses a string `template` option with the `<RecycleScroller>` component, which requires Vue's runtime compiler. The build system resolves `vue` to `vue/dist/vue.esm-bundler.js` (the compiler-included build) so template strings work without `.vue` SFC compilation.
+
+Item data is pre-built as a plain array with display values pre-computed (initials, title, badge, time) since Vue string templates cannot call imported functions.
+
+Returns `{ app, wrapper }`. `destroy()` calls `app.unmount()` and removes the wrapper element from its parent.
+
+---
+
+### `tanstack-solid-virtual.js`
+
+**Library:** @tanstack/solid-virtual  
+**Hook:** `createVirtualizer`
+
+⚠️ **This adapter uses a simplified implementation.** The current version uses manual DOM construction for initial rendering rather than full SolidJS fine-grained reactivity. It produces a correct initial render and is suitable for render-time and memory measurement, but the scroll phase may not reflect the library's true reactive performance. See [roadmap.md](./roadmap.md).
+
+Uses `solid-js/web` `render()` to mount a SolidJS component tree. Returns the dispose function. `destroy()` calls the dispose function.
+
+---
+
+### `clusterize.js`
+
+**Library:** Clusterize.js  
+**API:** Constructor
+
+Clusterize.js requires all row HTML strings to be provided upfront and needs specific DOM structure with known element IDs. The adapter:
+
+1. Creates a `scrollArea` div with a unique ID and appends a `contentArea` div inside it
+2. Pre-generates all `itemCount` row HTML strings using `generateRealisticItemHTML()`
+3. Constructs `new Clusterize({ rows, scrollId, contentId, rows_in_block: 50, blocks_in_cluster: 4 })`
+
+IDs are generated using a module-level counter (`clusterize-1`, `clusterize-2`, …) to avoid conflicts between benchmark iterations.
+
+**Note on initial render time:** Pre-generating HTML strings for large item counts (100K, 1M) is slow. This is reflected in Clusterize.js's render time metric — the benchmark correctly measures all work required to display the list.
+
+Returns `{ clusterize, scrollArea, id }`. `destroy()` calls `clusterize.destroy(true)` (removes rows from DOM) and removes `scrollArea` from its parent.
+
+---
+
+### `vlist.js`
+
+**Library:** @floor/vlist (Vanilla JS)
+
+Mounts the zero-dependency vanilla virtual list directly into the container using `vlist(container, { items, overscan, item: { height, template } })`. Uses `benchmarkTemplate` as the `item.template` function.
+
+Returns the vlist instance. `destroy()` calls `instance.destroy()`.
+
+---
+
+### `vlist-react.js`
+
+**Library:** vlist-react
+
+React binding for the vlist core. Passes `benchmarkTemplate` as the `item.template` prop. Returns the React root. `destroy()` calls `root.unmount()`.
+
+---
+
+### `vlist-vue.js`
+
+**Library:** vlist-vue
+
+Vue 3 binding for the vlist core. Like `vue-virtual-scroller.js`, mounts a Vue app into a wrapper div and uses a string template. Item display data is pre-computed in the data array.
+
+Returns `{ app, wrapper }`. `destroy()` unmounts the app and removes the wrapper element.
+
+---
+
+### `vlist-solidjs.js`
+
+**Library:** vlist-solidjs
+
+SolidJS binding for the vlist core. Uses `solid-js/web` `render()` to mount the VList component. Returns the dispose function. `destroy()` calls dispose.
+
+---
+
+### `vlist-svelte.js`
+
+**Library:** vlist-svelte
+
+Svelte binding for the vlist core. Handles both Svelte 4 and Svelte 5 APIs:
+
+- **Svelte 4** — `VList` is a class with a `$destroy()` method. The adapter calls `new VList({ target: container, props: { … } })` and `destroy()` calls `instance.$destroy()`.
+- **Svelte 5** — `VList` is a function. The adapter calls `mount(VList, { target, props })` from the `svelte` package and `destroy()` calls `unmount(instance)`.
+
+⚠️ **This adapter depends on the actual export format of `vlist-svelte`.** If the package does not export a Svelte 4 class or a Svelte 5-compatible component, it will throw at instantiation time. See [roadmap.md](./roadmap.md).
+
+---
+
+## Adding a New Adapter
+
+The complete step-by-step guide is in [adding-a-library.md](./adding-a-library.md). The short version:
+
+1. Copy `benchmarks/libraries/_TEMPLATE.js` to `benchmarks/libraries/{slug}.js`
+2. Implement `loadDependencies()`, `create()`, and `destroy()`
+3. Use `ITEM_HEIGHT`, `DEFAULT_OVERSCAN`, and the shared template helpers
+4. Import the new file in `benchmarks/script.js`
+5. Run `bun run build`
+
+The `_TEMPLATE.js` file is fully documented with inline comments and examples for both React and vanilla patterns.
+
+---
+
+## Adapter Status
+
+| Adapter | Status | Notes |
+|---------|--------|-------|
+| `react-window` | ✅ Implemented | |
+| `tanstack-virtual` | ✅ Implemented | Firefox compat workaround included |
+| `react-virtuoso` | ✅ Implemented | |
+| `virtua` | ✅ Implemented | Pre-builds children array |
+| `legend-list` | ✅ Implemented | Needs validation against actual package API |
+| `vue-virtual-scroller` | ✅ Implemented | |
+| `tanstack-solid-virtual` | ⚠️ Partial | Simplified render — not fully reactive |
+| `clusterize` | ✅ Implemented | Pre-generates all HTML upfront |
+| `vlist` | ✅ Implemented | |
+| `vlist-react` | ✅ Implemented | Needs validation of `style` prop API |
+| `vlist-vue` | ✅ Implemented | |
+| `vlist-solidjs` | ✅ Implemented | Needs validation of component call API |
+| `vlist-svelte` | ⚠️ Partial | Depends on package export format |

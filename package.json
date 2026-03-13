@@ -1,0 +1,50 @@
+{
+  "name": "virtuallist.io",
+  "version": "0.1.0",
+  "description": "Independent benchmark platform for virtual list libraries — fair, transparent, crowdsourced performance data",
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run build:bench && bun run --watch server.ts",
+    "dev:full": "bun run build:bench && bun run build:bench:watch & bun run --watch server.ts",
+    "start": "bun run server.ts",
+    "build": "bun run build:bench",
+    "build:bench": "bun run benchmarks/build.ts",
+    "build:bench:watch": "bun run benchmarks/build.ts --watch",
+    "seed:db": "bun run scripts/seed-db.ts",
+    "seed:db:force": "bun run scripts/seed-db.ts --force",
+    "test": "bun test test/",
+    "test:watch": "bun test --watch test/",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@floor/vlist": "^1.2.0",
+    "@legendapp/list": "3.0.0-beta.40",
+    "@tanstack/react-virtual": "^3.13.18",
+    "@tanstack/solid-virtual": "^3.13.18",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "clusterize.js": "^0.18.1",
+    "eta": "^4.5.1",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-virtuoso": "^4.18.3",
+    "react-window": "1.8.10",
+    "solid-js": "^1.9.11",
+    "virtua": "^0.48.6",
+    "vlist-react": "^1.2.0",
+    "vlist-solidjs": "^1.2.0",
+    "vlist-svelte": "^1.2.0",
+    "vlist-vue": "^1.2.0",
+    "vue": "^3.5.28",
+    "vue-virtual-scroller": "^2.0.0-beta.8"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.29.0",
+    "@types/bun": "latest",
+    "babel-preset-solid": "^1.9.10",
+    "sass": "^1.85.0",
+    "typescript": "^5.8.0"
+  }
+}
