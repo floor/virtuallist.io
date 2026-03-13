@@ -68,7 +68,7 @@ The plugin intercepts `onResolve` calls for framework package names and forces t
 
 ### Why Vue uses `vue.esm-bundler.js`
 
-The default `vue` export (`vue.esm-browser.js`) does not include the template compiler. Library adapters like `vue-virtual-scroller.js` and `vlist-vue.js` use Vue's string `template` option at runtime rather than compiling `.vue` SFC files. Without the compiler-included build, these adapters would fail with a "Runtime-only build, template compiler not available" error.
+The default `vue` export (`vue.esm-browser.js`) does not include the template compiler. The `vue-virtual-scroller.js` adapter uses Vue's string `template` option at runtime rather than compiling `.vue` SFC files. Without the compiler-included build, this adapter would fail with a "Runtime-only build, template compiler not available" error.
 
 `vue.esm-bundler.js` includes both the runtime and the compiler, making string templates work without any additional tooling.
 

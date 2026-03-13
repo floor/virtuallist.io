@@ -56,11 +56,11 @@ const STRESS_LEVELS = [
 ];
 
 const ECOSYSTEM_ORDER: Ecosystem[] = [
+  "vanilla",
   "react",
   "vue",
   "solid",
   "svelte",
-  "vanilla",
   "multi",
 ];
 

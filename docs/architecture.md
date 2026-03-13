@@ -46,11 +46,7 @@ virtuallist.io/
 │       ├── vue-virtual-scroller.js
 │       ├── tanstack-solid-virtual.js
 │       ├── clusterize.js
-│       ├── vlist.js
-│       ├── vlist-react.js
-│       ├── vlist-vue.js
-│       ├── vlist-solidjs.js
-│       └── vlist-svelte.js
+│       └── vlist.js
 │
 ├── scripts/
 │   └── seed-db.ts                # Creates data/benchmarks.db

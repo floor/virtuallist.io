@@ -13,7 +13,6 @@ Unlike benchmarks published by individual library authors, virtuallist.io has no
 ## Libraries Benchmarked
 
 ### React
-- [vlist-react](https://vlist.dev) — zero-dependency core, React binding
 - [TanStack Virtual](https://tanstack.com/virtual) — headless `useVirtualizer` hook
 - [react-window](https://react-window.vercel.app) — minimalist FixedSizeList / VariableSizeList
 - [react-virtuoso](https://virtuoso.dev) — feature-rich with auto-height, groups, tables
@@ -21,18 +20,13 @@ Unlike benchmarks published by individual library authors, virtuallist.io has no
 - [Legend List](https://github.com/LegendApp/legend-list) — item recycling, bidirectional infinite scroll
 
 ### Vue
-- [vlist-vue](https://vlist.dev) — zero-dependency core, Vue binding
 - [vue-virtual-scroller](https://github.com/Akryum/vue-virtual-scroller) — `<RecycleScroller>` with DOM recycling
 
 ### SolidJS
-- [vlist-solidjs](https://vlist.dev) — zero-dependency core, SolidJS binding
 - [TanStack Virtual (SolidJS)](https://tanstack.com/virtual) — `createVirtualizer` with fine-grained reactivity
 
-### Svelte
-- [vlist-svelte](https://vlist.dev) — zero-dependency core, Svelte binding
-
 ### Vanilla JS
-- [VList (Vanilla)](https://vlist.dev) — pure JavaScript, zero dependencies
+- [VList](https://vlist.dev) — pure JavaScript, zero dependencies
 - [Clusterize.js](https://clusterize.js.org) — lightweight DOM virtualization
 
 ## Metrics
@@ -46,13 +40,13 @@ Every benchmark run produces **4 core metrics**:
 | Scroll FPS | fps | Higher |
 | P95 Frame Time | ms | Lower |
 
-Scroll performance is tested at **7 progressive speeds** (720 px/s → 36,000 px/s) to expose performance cliffs invisible at a single speed.
+Scroll performance is tested at **5 progressive speeds** (1,800 px/s → 21,600 px/s) to expose performance cliffs invisible at a single speed.
 
 ## Methodology Highlights
 
 - **Three-phase measurement** — Timing, memory, and scroll are isolated phases
-- **5 render iterations** — Median reported to reduce noise
-- **Up to 10 memory attempts** — Negative deltas (GC artifacts) rejected
+- **3 render iterations** — Median reported to reduce noise
+- **Up to 5 memory attempts** — Negative deltas (GC artifacts) rejected
 - **Randomized execution order** — Coin flip per run eliminates JIT warmth bias
 - **GC barriers** — `tryGC()` + `waitFrames(5)` between library runs
 - **Identical DOM templates** — 7-element realistic item structure for all libraries
@@ -116,11 +110,7 @@ virtuallist.io/
 │       ├── vue-virtual-scroller.js
 │       ├── tanstack-solid-virtual.js
 │       ├── clusterize.js
-│       ├── vlist.js           # VList (Vanilla)
-│       ├── vlist-react.js
-│       ├── vlist-vue.js
-│       ├── vlist-solidjs.js
-│       └── vlist-svelte.js
+│       └── vlist.js           # VList
 ├── scripts/
 │   └── seed-db.ts             # SQLite database setup
 ├── data/

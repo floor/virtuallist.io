@@ -125,19 +125,6 @@ const LIBRARIES: LibraryInfo[] = [
     order: 40,
   },
   {
-    slug: "vlist-react",
-    name: "VList (React)",
-    tagline:
-      "Lightweight virtual list with zero-dependency core, React binding",
-    ecosystem: "react",
-    npm: "vlist-react",
-    github: "https://github.com/floor/vlist",
-    npmUrl: "https://www.npmjs.com/package/vlist-react",
-    homepage: "https://vlist.dev",
-    enabled: true,
-    order: 50,
-  },
-  {
     slug: "virtua",
     name: "Virtua",
     tagline: "Zero-config <VList> component (~3 kB per entry point)",
@@ -151,18 +138,6 @@ const LIBRARIES: LibraryInfo[] = [
 
   // ── Vue Ecosystem ───────────────────────────────────────────────────────
   {
-    slug: "vlist-vue",
-    name: "VList (Vue)",
-    tagline: "Lightweight virtual list with zero-dependency core, Vue binding",
-    ecosystem: "vue",
-    npm: "vlist-vue",
-    github: "https://github.com/floor/vlist",
-    npmUrl: "https://www.npmjs.com/package/vlist-vue",
-    homepage: "https://vlist.dev",
-    enabled: true,
-    order: 100,
-  },
-  {
     slug: "vue-virtual-scroller",
     name: "vue-virtual-scroller",
     tagline: "RecycleScroller component with DOM recycling for Vue 3",
@@ -171,7 +146,7 @@ const LIBRARIES: LibraryInfo[] = [
     github: "https://github.com/Akryum/vue-virtual-scroller",
     npmUrl: "https://www.npmjs.com/package/vue-virtual-scroller",
     enabled: true,
-    order: 110,
+    order: 100,
   },
 
   // ── SolidJS Ecosystem ──────────────────────────────────────────────────
@@ -187,34 +162,6 @@ const LIBRARIES: LibraryInfo[] = [
     enabled: true,
     order: 200,
   },
-  {
-    slug: "vlist-solidjs",
-    name: "VList (SolidJS)",
-    tagline:
-      "Lightweight virtual list with zero-dependency core, SolidJS binding",
-    ecosystem: "solid",
-    npm: "vlist-solidjs",
-    github: "https://github.com/floor/vlist",
-    npmUrl: "https://www.npmjs.com/package/vlist-solidjs",
-    homepage: "https://vlist.dev",
-    enabled: true,
-    order: 210,
-  },
-
-  // ── Svelte Ecosystem ──────────────────────────────────────────────────
-  {
-    slug: "vlist-svelte",
-    name: "VList (Svelte)",
-    tagline:
-      "Lightweight virtual list with zero-dependency core, Svelte binding",
-    ecosystem: "svelte",
-    npm: "vlist-svelte",
-    github: "https://github.com/floor/vlist",
-    npmUrl: "https://www.npmjs.com/package/vlist-svelte",
-    homepage: "https://vlist.dev",
-    enabled: true,
-    order: 300,
-  },
 
   // ── Vanilla / Framework-agnostic ──────────────────────────────────────
   {
@@ -227,11 +174,11 @@ const LIBRARIES: LibraryInfo[] = [
     npmUrl: "https://www.npmjs.com/package/clusterize.js",
     homepage: "https://clusterize.js.org",
     enabled: true,
-    order: 400,
+    order: 300,
   },
   {
     slug: "vlist",
-    name: "VList (Vanilla)",
+    name: "VList",
     tagline:
       "Zero-dependency virtual list — pure JavaScript, no framework required",
     ecosystem: "vanilla",
@@ -240,7 +187,7 @@ const LIBRARIES: LibraryInfo[] = [
     npmUrl: "https://www.npmjs.com/package/@floor/vlist",
     homepage: "https://vlist.dev",
     enabled: true,
-    order: 410,
+    order: 310,
   },
 ];
 

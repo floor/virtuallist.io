@@ -228,50 +228,13 @@ Returns `{ clusterize, scrollArea, id }`. `destroy()` calls `clusterize.destroy(
 
 ### `vlist.js`
 
-**Library:** @floor/vlist (Vanilla JS)
+**Library:** @floor/vlist
 
-Mounts the zero-dependency vanilla virtual list directly into the container using `vlist({ container, items, overscan, item: { height, template } }).build()`. Uses `benchmarkTemplate` as the `item.template` function.
+Mounts the zero-dependency virtual list directly into the container using `vlist({ container, items, overscan, item: { height, template } }).build()`. Uses `benchmarkTemplate` as the `item.template` function.
 
 Returns the vlist instance. `destroy()` calls `instance.destroy()`.
 
 ---
-
-### `vlist-react.js`
-
-**Library:** vlist-react
-
-React binding for the vlist core. Passes `benchmarkTemplate` as the `item.template` prop and sets `style={{ height, width: "100%" }}` on the `<VList>` component so it fills the benchmark container. Returns the React root. `destroy()` calls `root.unmount()`.
-
----
-
-### `vlist-vue.js`
-
-**Library:** vlist-vue
-
-Vue 3 binding for the vlist core. Like `vue-virtual-scroller.js`, mounts a Vue app into a wrapper div and uses a string template. Item display data is pre-computed in the data array.
-
-Returns `{ app, wrapper }`. `destroy()` unmounts the app and removes the wrapper element.
-
----
-
-### `vlist-solidjs.js`
-
-**Library:** vlist-solidjs
-
-SolidJS binding for the vlist core. Uses `solid-js/web` `render()` to mount the VList component. Returns the dispose function. `destroy()` calls dispose.
-
----
-
-### `vlist-svelte.js`
-
-**Library:** vlist-svelte
-
-Svelte binding for the vlist core. Handles both Svelte 4 and Svelte 5 APIs:
-
-- **Svelte 4** — `VList` is a class with a `$destroy()` method. The adapter calls `new VList({ target: container, props: { … } })` and `destroy()` calls `instance.$destroy()`.
-- **Svelte 5** — `VList` is a function. The adapter calls `mount(VList, { target, props })` from the `svelte` package and `destroy()` calls `unmount(instance)`.
-
-⚠️ **This adapter depends on the actual export format of `vlist-svelte`.** If the package does not export a Svelte 4 class or a Svelte 5-compatible component, it will throw at instantiation time. See [roadmap.md](./roadmap.md).
 
 ---
 
@@ -302,7 +265,3 @@ The `_TEMPLATE.js` file is fully documented with inline comments and examples fo
 | `tanstack-solid-virtual` | ⚠️ Partial | Simplified render — not fully reactive |
 | `clusterize` | ✅ Implemented | Pre-generates all HTML upfront |
 | `vlist` | ✅ Implemented | |
-| `vlist-react` | ✅ Implemented | |
-| `vlist-vue` | ✅ Implemented | |
-| `vlist-solidjs` | ✅ Implemented | |
-| `vlist-svelte` | ⚠️ Partial | Depends on package export format |

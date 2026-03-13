@@ -25,16 +25,11 @@ import "./libraries/legend-list.js";
 import "./libraries/react-virtuoso.js";
 import "./libraries/react-window.js";
 import "./libraries/tanstack-virtual.js";
-import "./libraries/vlist-react.js";
 import "./libraries/virtua.js";
 // Vue
-import "./libraries/vlist-vue.js";
 import "./libraries/vue-virtual-scroller.js";
 // SolidJS
 import "./libraries/tanstack-solid-virtual.js";
-import "./libraries/vlist-solidjs.js";
-// Svelte
-import "./libraries/vlist-svelte.js";
 // Vanilla
 import "./libraries/clusterize.js";
 import "./libraries/vlist.js";

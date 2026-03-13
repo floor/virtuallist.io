@@ -13,6 +13,35 @@
 //   - Rating: threshold-based quality ratings for metrics
 
 // =============================================================================
+// Constants (from constants.js)
+// =============================================================================
+
+export {
+  ITEM_HEIGHT,
+  MEASURE_ITERATIONS,
+  MEMORY_ATTEMPTS,
+  SCROLL_DURATION_MS,
+  BASE_SCROLL_SPEED,
+  DEFAULT_OVERSCAN,
+  SCROLL_SPEEDS,
+  STRESS_LEVELS,
+  ITEM_NAMES,
+  ITEM_BADGES,
+} from "./constants.js";
+
+import {
+  ITEM_HEIGHT,
+  MEASURE_ITERATIONS,
+  MEMORY_ATTEMPTS,
+  SCROLL_DURATION_MS,
+  BASE_SCROLL_SPEED,
+  DEFAULT_OVERSCAN,
+  SCROLL_SPEEDS,
+  ITEM_NAMES,
+  ITEM_BADGES,
+} from "./constants.js";
+
+// =============================================================================
 // Types (via JSDoc)
 // =============================================================================
 
@@ -94,111 +123,8 @@ export const getLibraries = () => [...libraries.values()];
 export const getLibrary = (slug) => libraries.get(slug);
 
 // =============================================================================
-// Constants
-// =============================================================================
-
-/** Fixed row height for all benchmarks (px). */
-export const ITEM_HEIGHT = 48;
-
-/** Number of render iterations for median calculation. */
-export const MEASURE_ITERATIONS = 5;
-
-/** Maximum memory measurement attempts. */
-export const MEMORY_ATTEMPTS = 10;
-
-/** Scroll test duration per speed level (ms). */
-export const SCROLL_DURATION_MS = 2000;
-
-/**
- * Base scroll speed in pixels per second.
- * 1× = 7200 px/s ≈ 2.5 items/frame at 60fps (48px items).
- */
-export const BASE_SCROLL_SPEED = 7200;
-
-/**
- * Default overscan for all libraries (items rendered off-screen).
- * Used where the library supports configurable overscan.
- */
-export const DEFAULT_OVERSCAN = 5;
-
-// =============================================================================
-// Scroll Speed Presets
-// =============================================================================
-
-/**
- * Build a scroll speed preset from a multiplier of BASE_SCROLL_SPEED.
- * @param {string} id - Identifier
- * @param {number} multiplier - Speed multiplier
- * @returns {{id: string, label: string, pxPerSec: number}}
- */
-const scrollSpeed = (id, multiplier) => {
-  const pxPerSec = BASE_SCROLL_SPEED * multiplier;
-  return {
-    id,
-    label: `${pxPerSec.toLocaleString()} px/s`,
-    pxPerSec,
-  };
-};
-
-/**
- * 7 progressive scroll speeds for comprehensive performance profiling.
- *
- *   - 0.1× (720 px/s):   Crawl — pure baseline overhead
- *   - 0.25× (1800 px/s):  Gentle browsing — minimal recycling
- *   - 0.5× (3600 px/s):   Casual scrolling
- *   - 1× (7200 px/s):     Normal scroll speed
- *   - 2× (14400 px/s):    Fast flick — aggressive touch/wheel
- *   - 3× (21600 px/s):    Aggressive scroll
- *   - 5× (36000 px/s):    Stress test — heavy DOM churn
- */
-export const SCROLL_SPEEDS = [
-  scrollSpeed("crawl", 0.1),
-  scrollSpeed("gentle", 0.25),
-  scrollSpeed("slow", 0.5),
-  scrollSpeed("normal", 1),
-  scrollSpeed("fast", 2),
-  scrollSpeed("aggressive", 3),
-  scrollSpeed("extreme", 5),
-];
-
-// =============================================================================
-// CPU Stress Levels
-// =============================================================================
-
-/**
- * Available stress levels for benchmarks.
- * Each level burns a fixed amount of CPU time per frame during scroll
- * measurement, simulating an application with other work alongside
- * the virtual list.
- */
-export const STRESS_LEVELS = [
-  { id: "none", label: "0", ms: 0 },
-  { id: "light", label: "3", ms: 3 },
-  { id: "medium", label: "5", ms: 5 },
-  { id: "heavy", label: "7", ms: 7 },
-];
-
-// =============================================================================
 // Realistic Item Template
 // =============================================================================
-
-/**
- * Shared item data arrays — every library renders the exact same text content.
- */
-export const ITEM_NAMES = [
-  "Alice",
-  "Bob",
-  "Carol",
-  "Dave",
-  "Eve",
-  "Frank",
-  "Grace",
-  "Hank",
-  "Iris",
-  "Jack",
-];
-
-export const ITEM_BADGES = ["Active", "New", "VIP", "Pro"];
 
 /**
  * Realistic item template for benchmarks.
@@ -801,9 +727,9 @@ export const measureMemoryWithRetries = async ({
 /**
  * Run the full three-phase benchmark for a single library.
  *
- * Phase 1: Timing (5 iterations, median render time)
- * Phase 2: Memory (up to 10 attempts, median of valid readings)
- * Phase 3: Scroll (7 speeds × 2 seconds each, FPS + P95 frame time)
+ * Phase 1: Timing (MEASURE_ITERATIONS iterations, median render time)
+ * Phase 2: Memory (up to MEMORY_ATTEMPTS attempts, median of valid readings)
+ * Phase 3: Scroll (SCROLL_SPEEDS.length speeds × SCROLL_DURATION_MS ms each)
  *
  * This function is library-agnostic — it takes create/destroy callbacks
  * and produces identical measurement data for every library.
@@ -881,7 +807,7 @@ export const benchmarkLibrary = async ({
   });
 
   // ═══════════════════════════════════════════════════════════════════════
-  // Phase 3: Scroll Performance (7 speeds)
+  // Phase 3: Scroll Performance
   // ═══════════════════════════════════════════════════════════════════════
 
   // The memory phase left an instance mounted — reuse it for scrolling

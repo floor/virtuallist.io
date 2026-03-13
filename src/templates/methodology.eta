@@ -127,13 +127,11 @@
           </tr>
         </thead>
         <tbody>
-          <tr><td>0.1×</td><td>720 px/s</td><td><%= it.t("speeds.crawl") %></td></tr>
           <tr><td>0.25×</td><td>1,800 px/s</td><td><%= it.t("speeds.gentle") %></td></tr>
           <tr><td>0.5×</td><td>3,600 px/s</td><td><%= it.t("speeds.slow") %></td></tr>
           <tr><td>1×</td><td>7,200 px/s</td><td><%= it.t("speeds.normal") %></td></tr>
           <tr><td>2×</td><td>14,400 px/s</td><td><%= it.t("speeds.fast") %></td></tr>
           <tr><td>3×</td><td>21,600 px/s</td><td><%= it.t("speeds.aggressive") %></td></tr>
-          <tr><td>5×</td><td>36,000 px/s</td><td><%= it.t("speeds.extreme") %></td></tr>
         </tbody>
       </table>
     </div>

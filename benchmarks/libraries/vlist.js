@@ -1,6 +1,6 @@
-// benchmarks/libraries/vlist.js — VList (Vanilla) benchmark adapter
+// benchmarks/libraries/vlist.js — VList benchmark adapter
 //
-// Registers the zero-dependency vanilla JS @floor/vlist with the benchmark
+// Registers the zero-dependency @floor/vlist with the benchmark
 // runner so it can be tested with the same measurement pipeline as every
 // other library.
 //
@@ -64,7 +64,7 @@ const getItems = (itemCount) => {
 
 defineLibrary({
   slug: "vlist",
-  name: "VList (Vanilla)",
+  name: "VList",
   ecosystem: "vanilla",
 
   /**
@@ -87,7 +87,7 @@ defineLibrary({
 
     if (!vlist) {
       throw new Error(
-        "VList (Vanilla) is not available -- failed to load @floor/vlist" +
+        "VList is not available -- failed to load @floor/vlist" +
           (loadError ? `: ${loadError.message}` : ""),
       );
     }

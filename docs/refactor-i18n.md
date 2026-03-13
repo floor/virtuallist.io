@@ -248,13 +248,13 @@ pipeline must preserve inline tags.
     "intro": "Every benchmark run produces four core metrics, chosen to capture the most important aspects of virtual list performance:",
     "render_name": "Initial Render",
     "render_unit": "Milliseconds · Lower is better",
-    "render_desc": "Time from library instantiation to first paint. Measured as the median of 5 iterations using <code>performance.mark/measure</code> for DevTools integration. Each iteration creates a fresh instance and waits for the next animation frame.",
+    "render_desc": "Time from library instantiation to first paint. Measured as the median of 3 iterations using <code>performance.mark/measure</code> for DevTools integration. Each iteration creates a fresh instance and waits for the next animation frame.",
     "memory_name": "Memory Usage",
     "memory_unit": "Megabytes · Lower is better",
-    "memory_desc": "JS heap delta after rendering the list. Uses Chrome's <code>performance.memory.usedJSHeapSize</code> API with up to 10 measurement attempts. Negative deltas (GC artifacts) are rejected; the median of valid readings is reported. Not available in Firefox.",
+    "memory_desc": "JS heap delta after rendering the list. Uses Chrome's <code>performance.memory.usedJSHeapSize</code> API with up to 5 measurement attempts. Negative deltas (GC artifacts) are rejected; the median of valid readings is reported. Not available in Firefox.",
     "fps_name": "Scroll FPS",
     "fps_unit": "Frames per second · Higher is better",
-    "fps_desc": "Sustained scroll performance measured over 2 seconds per speed level. A <code>requestAnimationFrame</code> paint counter records frame delivery times while a high-frequency <code>setTimeout</code> scroll driver advances <code>scrollTop</code> at a constant pixels-per-second rate. Median FPS is computed from recorded frame intervals.",
+    "fps_desc": "Sustained scroll performance measured over 1.5 seconds per speed level. A <code>requestAnimationFrame</code> paint counter records frame delivery times while a high-frequency <code>setTimeout</code> scroll driver advances <code>scrollTop</code> at a constant pixels-per-second rate. Median FPS is computed from recorded frame intervals.",
     "p95_name": "P95 Frame Time",
     "p95_unit": "Milliseconds · Lower is better",
     "p95_desc": "The 95th percentile frame time during scroll — a measure of consistency and jank. While median FPS shows average throughput, P95 reveals the worst-case stutters that users actually feel. Computed from the same frame time array as FPS."
@@ -263,11 +263,11 @@ pipeline must preserve inline tags.
     "title": "Three-Phase Measurement",
     "intro": "Each benchmark run executes three isolated phases to prevent cross-contamination between measurements:",
     "timing_title": "Timing Phase",
-    "timing_desc": "The library is instantiated and destroyed 5 times. Each iteration is timed with <code>performance.mark/measure</code>. The median duration is reported as the render time. The container is cleaned and GC is triggered between iterations.",
+    "timing_desc": "The library is instantiated and destroyed 3 times. Each iteration is timed with <code>performance.mark/measure</code>. The median duration is reported as the render time. The container is cleaned and GC is triggered between iterations.",
     "memory_title": "Memory Phase",
-    "memory_desc": "Completely separate from timing. The heap is aggressively settled (3 cycles of <code>gc()</code> + 150ms + 5 frames), a baseline snapshot is taken, the library is instantiated, a gentle GC reclaims transient allocations, and a second snapshot is taken. Up to 10 attempts are made; negative deltas are discarded.",
+    "memory_desc": "Completely separate from timing. The heap is aggressively settled (3 cycles of <code>gc()</code> + 150ms + 5 frames), a baseline snapshot is taken, the library is instantiated, a gentle GC reclaims transient allocations, and a second snapshot is taken. Up to 5 attempts are made; negative deltas are discarded.",
     "scroll_title": "Scroll Phase",
-    "scroll_desc": "The instance from the last memory attempt is reused (it's still mounted). A dual-loop architecture drives the scroll: a <code>setTimeout(0)</code> loop updates <code>scrollTop</code> ~250 times/sec for smooth sub-pixel scrolling, while a <code>requestAnimationFrame</code> loop records frame delivery times. Each of 7 speed levels runs for 2 seconds with bidirectional scrolling (bouncing at edges)."
+    "scroll_desc": "The instance from the last memory attempt is reused (it's still mounted). A dual-loop architecture drives the scroll: a <code>setTimeout(0)</code> loop updates <code>scrollTop</code> ~250 times/sec for smooth sub-pixel scrolling, while a <code>requestAnimationFrame</code> loop records frame delivery times. Each of 5 speed levels runs for 1.5 seconds with bidirectional scrolling (bouncing at edges)."
   },
   "fairness": {
     "title": "Fairness Guarantees",
@@ -286,18 +286,16 @@ pipeline must preserve inline tags.
     "overscan_desc": "All libraries use an overscan of 5 items (where configurable) to ensure they render the same number of off-screen elements."
   },
   "speeds": {
-    "title": "7 Scroll Speeds",
-    "intro": "Testing at a single scroll speed can miss performance cliffs — a library might be perfect at casual speeds but fall apart under aggressive scrolling. Each benchmark tests at 7 progressive speeds:",
+    "title": "5 Scroll Speeds",
+    "intro": "Testing at a single scroll speed can miss performance cliffs — a library might be perfect at casual speeds but fall apart under aggressive scrolling. Each benchmark tests at 5 progressive speeds:",
     "col_level": "Level",
     "col_speed": "Speed",
     "col_desc": "Description",
-    "crawl": "Crawl — pure baseline overhead measurement",
     "gentle": "Gentle browsing — minimal DOM recycling",
     "slow": "Casual scrolling — light recycling",
     "normal": "Normal scroll speed — baseline reference",
     "fast": "Fast flick — aggressive touch/wheel gesture",
     "aggressive": "Aggressive scroll — heavy DOM churn",
-    "extreme": "Extreme stress test — maximum pressure",
     "note": "All speeds are multiples of the base speed (7,200 px/s ≈ 2.5 items/frame at 60fps with 48px items). Time-based scrolling ensures consistent speed regardless of monitor refresh rate."
   },
   "stress": {

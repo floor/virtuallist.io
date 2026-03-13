@@ -70,15 +70,13 @@ Seven progressive speed presets built from `BASE_SCROLL_SPEED` multipliers. Test
 
 | ID | Multiplier | px/s | Characteristic |
 |----|-----------|------|---------------|
-| `crawl` | 0.1× | 720 | Pure baseline overhead |
 | `gentle` | 0.25× | 1,800 | Gentle browsing |
 | `slow` | 0.5× | 3,600 | Casual scrolling |
 | `normal` | 1× | 7,200 | Normal speed |
 | `fast` | 2× | 14,400 | Aggressive flick |
 | `aggressive` | 3× | 21,600 | Heavy DOM churn |
-| `extreme` | 5× | 36,000 | Maximum stress |
 
-Total scroll time per benchmark run: 7 speeds × 2 seconds = **14 seconds of scrolling**.
+Total scroll time per benchmark run: 5 speeds × 1.5 seconds = **7.5 seconds of scrolling**.
 
 ### `STRESS_LEVELS`
 
@@ -334,8 +332,8 @@ Phase 3 reuses the instance left alive by Phase 2, avoiding an extra create/sett
     speedId, speedLabel, pxPerSec,
     medianFPS, medianFrameTime, p95FrameTime, totalFrames
   }>,
-  avgFPS: number,            // mean FPS across all 7 speeds
-  avgP95: number             // mean P95 frame time across all 7 speeds
+  avgFPS: number,            // mean FPS across all 5 speeds
+  avgP95: number             // mean P95 frame time across all 5 speeds
 }
 ```
 

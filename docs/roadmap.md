@@ -109,35 +109,11 @@ The current implementation uses manual DOM construction rather than SolidJS's fi
 
 ---
 
-### `vlist-solidjs.js` — Needs API validation
-
-The adapter calls the VList component directly as a function. The actual `vlist-solidjs` package may export a Svelte-style component or require a different calling convention.
-
-**What it needs:** Running the benchmark against the live package and verifying the output. The adapter may need to be rewritten once the actual API is confirmed.
-
----
-
-### `vlist-svelte.js` — Depends on package export format
-
-The adapter handles both Svelte 4 (`$destroy()`) and Svelte 5 (`unmount()`) APIs. Whether it works depends entirely on which format `vlist-svelte` uses.
-
-**What it needs:** Running against the live package and verifying. If the package uses Svelte's component compilation differently, the adapter's instantiation logic may need to change.
-
----
-
 ### `legend-list.js` — API needs verification
 
 The adapter assumes `LegendList` accepts `data`, `renderItem`, `keyExtractor`, `estimatedItemSize`, `recycleItems`, and `drawDistance` props. The `@legendapp/list` package is in beta and its API may differ.
 
 **What it needs:** Running against the live package and verifying the prop names match.
-
----
-
-### `vlist-react.js` — Container sizing assumption
-
-The adapter passes a `style` prop with `height` and `width` to `VList`. The actual vlist-react API may size the component differently (e.g. expecting the container to handle sizing rather than the component itself).
-
-**What it needs:** Running against the live package and verifying.
 
 ---
 
@@ -157,11 +133,9 @@ The adapter passes a `style` prop with `height` and `width` to `VList`. The actu
 
 ### Memory phase duration
 
-**Problem:** The memory phase runs up to 10 attempts, each preceded by `settleHeap()` (3 cycles × ~650 ms = ~2 seconds). At 10 attempts, Phase 2 can take up to 20 seconds before reporting a result.
+**Problem:** The memory phase runs up to `MEMORY_ATTEMPTS` attempts, each preceded by `settleHeap()` (3 cycles × ~650 ms = ~2 seconds).
 
-**Option:** Reduce `MEMORY_ATTEMPTS` from 10 to 5 or 3. The trade-off is fewer valid readings and a higher chance of reporting `"—"` instead of a number.
-
-**Current stance:** 10 attempts with a 2-second settle per attempt was chosen for measurement accuracy. A future improvement could reduce settle time while maintaining attempt count, or show a live "attempt N/10" progress indicator to set visitor expectations.
+**Current setting:** `MEMORY_ATTEMPTS = 5` (reduced from 10). Most valid readings come in the first 3–5 attempts, and 5 gives a reliable median while cutting Phase 2 time roughly in half. A future improvement could reduce settle time per attempt for further gains.
 
 ---
 
