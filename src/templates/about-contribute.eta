@@ -1,0 +1,203 @@
+<div class="about-page">
+  <header class="about-header">
+    <h1 class="about-header__title"><%= it.t("contribute.title") %></h1>
+    <p class="about-header__subtitle"><%= it.t("contribute.subtitle") %></p>
+  </header>
+
+  <section class="about-section">
+    <h2 class="about-section__title"><%= it.t("contribute.how_title") %></h2>
+    <p class="about-text"><%~ it.t("contribute.how_p1") %></p>
+    <p class="about-text"><%~ it.t("contribute.how_p2") %></p>
+  </section>
+
+  <section class="about-section">
+    <h2 class="about-section__title"><%= it.t("contribute.req_title") %></h2>
+    <p class="about-text"><%~ it.t("contribute.req_intro") %></p>
+    <div class="about-req-list">
+      <div class="about-req">
+        <span class="about-req__label"><%= it.t("contribute.req_height_label") %></span>
+        <span class="about-req__desc"><%~ it.t("contribute.req_height_desc") %></span>
+      </div>
+      <div class="about-req">
+        <span class="about-req__label"><%= it.t("contribute.req_overscan_label") %></span>
+        <span class="about-req__desc"><%~ it.t("contribute.req_overscan_desc") %></span>
+      </div>
+      <div class="about-req">
+        <span class="about-req__label"><%= it.t("contribute.req_template_label") %></span>
+        <span class="about-req__desc"><%~ it.t("contribute.req_template_desc") %></span>
+      </div>
+      <div class="about-req">
+        <span class="about-req__label"><%= it.t("contribute.req_destroy_label") %></span>
+        <span class="about-req__desc"><%~ it.t("contribute.req_destroy_desc") %></span>
+      </div>
+    </div>
+  </section>
+
+  <section class="about-section">
+    <h2 class="about-section__title"><%= it.t("contribute.steps_title") %></h2>
+
+    <div class="about-steps">
+      <div class="about-step">
+        <div class="about-step__number">1</div>
+        <div class="about-step__content">
+          <h3 class="about-step__title"><%= it.t("contribute.step1_title") %></h3>
+          <p class="about-step__desc"><%~ it.t("contribute.step1_desc") %></p>
+        </div>
+      </div>
+
+      <div class="about-step">
+        <div class="about-step__number">2</div>
+        <div class="about-step__content">
+          <h3 class="about-step__title"><%= it.t("contribute.step2_title") %></h3>
+          <p class="about-step__desc"><%~ it.t("contribute.step2_desc") %></p>
+          <pre class="about-pre">{
+  slug: "my-library",
+  name: "My Library",
+  tagline: "One sentence about what makes it different.",
+  ecosystem: "react",
+  npm: "my-library",
+  github: "https://github.com/you/my-library",
+  npmUrl: "https://www.npmjs.com/package/my-library",
+  enabled: true,
+  order: 70,
+}</pre>
+        </div>
+      </div>
+
+      <div class="about-step">
+        <div class="about-step__number">3</div>
+        <div class="about-step__content">
+          <h3 class="about-step__title"><%= it.t("contribute.step3_title") %></h3>
+          <pre class="about-pre">bun add my-library</pre>
+        </div>
+      </div>
+
+      <div class="about-step">
+        <div class="about-step__number">4</div>
+        <div class="about-step__content">
+          <h3 class="about-step__title"><%= it.t("contribute.step4_title") %></h3>
+          <p class="about-step__desc"><%~ it.t("contribute.step4_desc") %></p>
+          <pre class="about-pre">import {
+  defineLibrary,
+  ITEM_HEIGHT,
+  DEFAULT_OVERSCAN,
+  createRealisticReactChildren,
+} from "../runner.js";
+
+let React, ReactDOM, VirtualList;
+
+const loadDependencies = async () => {
+  if (!React) {
+    React = await import("react");
+    const client = await import("react-dom/client");
+    ReactDOM = client.createRoot ? client : (client.default ?? client);
+    const mod = await import("my-library");
+    VirtualList = mod.VirtualList;
+  }
+  return true;
+};
+
+defineLibrary({
+  slug: "my-library",
+  name: "My Library",
+  ecosystem: "react",
+
+  create: async (container, itemCount) => {
+    await loadDependencies();
+    const root = ReactDOM.createRoot(container);
+    root.render(
+      React.createElement(VirtualList, {
+        height: container.clientHeight || 600,
+        itemCount,
+        itemSize: ITEM_HEIGHT,
+        overscanCount: DEFAULT_OVERSCAN,
+        children: ({ index, style }) =>
+          React.createElement(
+            "div",
+            { className: "bench-item", style },
+            ...createRealisticReactChildren(React, index),
+          ),
+      })
+    );
+    return root;
+  },
+
+  destroy: async (root) => {
+    root?.unmount();
+  },
+});</pre>
+        </div>
+      </div>
+
+      <div class="about-step">
+        <div class="about-step__number">5</div>
+        <div class="about-step__content">
+          <h3 class="about-step__title"><%= it.t("contribute.step5_title") %></h3>
+          <p class="about-step__desc"><%~ it.t("contribute.step5_desc") %></p>
+          <pre class="about-pre">import "./libraries/my-library.js";</pre>
+        </div>
+      </div>
+
+      <div class="about-step">
+        <div class="about-step__number">6</div>
+        <div class="about-step__content">
+          <h3 class="about-step__title"><%= it.t("contribute.step6_title") %></h3>
+          <pre class="about-pre">bun run seed:db
+bun run build
+bun run dev
+# open http://localhost:3456/benchmarks/my-library
+# click Run — all four metrics should complete</pre>
+        </div>
+      </div>
+
+      <div class="about-step">
+        <div class="about-step__number">7</div>
+        <div class="about-step__content">
+          <h3 class="about-step__title"><%= it.t("contribute.step7_title") %></h3>
+          <p class="about-step__desc"><%~ it.t("contribute.step7_desc") %></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="about-section">
+    <h2 class="about-section__title"><%= it.t("contribute.helpers_title") %></h2>
+    <p class="about-text"><%~ it.t("contribute.helpers_intro") %></p>
+    <div class="about-helpers">
+      <div class="about-helper">
+        <code class="about-helper__name">createRealisticReactChildren(React, index)</code>
+        <span class="about-helper__desc"><%~ it.t("contribute.helper_react_desc") %></span>
+      </div>
+      <div class="about-helper">
+        <code class="about-helper__name">benchmarkTemplate(_item, index)</code>
+        <span class="about-helper__desc"><%~ it.t("contribute.helper_template_desc") %></span>
+      </div>
+      <div class="about-helper">
+        <code class="about-helper__name">populateRealisticDOMChildren(el, index)</code>
+        <span class="about-helper__desc"><%~ it.t("contribute.helper_dom_desc") %></span>
+      </div>
+      <div class="about-helper">
+        <code class="about-helper__name">generateRealisticItemHTML(index, height)</code>
+        <span class="about-helper__desc"><%~ it.t("contribute.helper_html_desc") %></span>
+      </div>
+    </div>
+  </section>
+
+  <section class="about-section">
+    <h2 class="about-section__title"><%= it.t("contribute.other_title") %></h2>
+    <div class="about-contrib-list">
+      <div class="about-contrib">
+        <strong><%= it.t("contribute.other_fix_label") %></strong>
+        <span><%= it.t("contribute.other_fix_desc") %></span>
+      </div>
+      <div class="about-contrib">
+        <strong><%= it.t("contribute.other_run_label") %></strong>
+        <span><%= it.t("contribute.other_run_desc") %></span>
+      </div>
+      <div class="about-contrib">
+        <strong><%= it.t("contribute.other_report_label") %></strong>
+        <span><%= it.t("contribute.other_report_desc") %></span>
+      </div>
+    </div>
+  </section>
+</div>

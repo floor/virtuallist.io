@@ -5,15 +5,15 @@
 //   /benchmarks          → Overview with all libraries grouped by ecosystem
 //   /benchmarks/{slug}   → Individual library benchmark page (interactive)
 //
-// Individual pages load the benchmark script which handles:
-//   - Suite registration and execution
-//   - Live metrics display
-//   - Result persistence to /api/benchmarks
+// All HTML lives in src/templates/benchmarks-*.eta.
+// All user-facing strings live in locales/{locale}/benchmarks.json + common.json.
+// This file is logic only: data collection + template rendering.
 
 import { SITE, IS_PROD } from "../config";
+import { renderTemplate } from "../eta";
 import { renderShell } from "../shell";
+import { makeT, detectLocale, type Locale } from "../i18n";
 import {
-  getLibraries,
   getLibrary,
   getLibrariesByEcosystem,
   getEcosystemLabel,
@@ -23,15 +23,7 @@ import {
 } from "../registry";
 
 // =============================================================================
-// Types
-// =============================================================================
-
-interface BenchmarkPageOptions {
-  slug: string | null;
-}
-
-// =============================================================================
-// Cache
+// Cache (keyed by locale + slug for multi-language support)
 // =============================================================================
 
 const pageCache = new Map<string, string>();
@@ -54,17 +46,18 @@ const STRESS_LEVELS = [
   { id: "heavy", label: "7", ms: 7 },
 ];
 
+const ECOSYSTEM_ORDER: Ecosystem[] = [
+  "react",
+  "vue",
+  "solid",
+  "svelte",
+  "vanilla",
+  "multi",
+];
+
 // =============================================================================
 // Helpers
 // =============================================================================
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
 
 function formatItemCount(count: number): string {
   if (count >= 1_000_000) return `${count / 1_000_000}M`;
@@ -72,253 +65,126 @@ function formatItemCount(count: number): string {
   return String(count);
 }
 
-// =============================================================================
-// Overview Page
-// =============================================================================
+let _ecosystemData: ReturnType<typeof _buildEcosystemData> | null = null;
 
-function buildOverviewContent(): string {
-  const byEcosystem = getLibrariesByEcosystem();
-  const count = getLibraryCount();
-
-  // Render order for ecosystems
-  const ecosystemOrder: Ecosystem[] = [
-    "react",
-    "vue",
-    "solid",
-    "svelte",
-    "vanilla",
-    "multi",
-  ];
-
-  const sections: string[] = [];
-
-  for (const eco of ecosystemOrder) {
-    const libs = byEcosystem.get(eco);
-    if (!libs || libs.length === 0) continue;
-
-    const label = getEcosystemLabel(eco);
-    const cards = libs
-      .map(
-        (lib) => `
-          <a href="/benchmarks/${lib.slug}" class="bench-overview-card">
-            <div class="bench-overview-card__header">
-              <span class="bench-overview-card__name">${escapeHtml(lib.name)}</span>
-              <span class="bench-overview-card__ecosystem">${escapeHtml(label)}</span>
-            </div>
-            <p class="bench-overview-card__desc">${escapeHtml(lib.tagline)}</p>
-            <div class="bench-overview-card__footer">
-              <code class="bench-overview-card__npm">${escapeHtml(lib.npm)}</code>
-              <span class="bench-overview-card__arrow">→</span>
-            </div>
-          </a>`,
-      )
-      .join("");
-
-    sections.push(`
-      <div class="bench-overview__section">
-        <h3 class="bench-overview__ecosystem-label">${escapeHtml(label)}</h3>
-        <div class="bench-overview__grid">
-          ${cards}
-        </div>
-      </div>`);
-  }
-
-  return `
-    <div class="bench-overview">
-      <header class="bench-overview__header">
-        <h1 class="bench-overview__title">Benchmarks</h1>
-        <p class="bench-overview__desc">
-          Live performance benchmarks for <strong>${count} virtual list libraries</strong>.
-          Each benchmark runs in your browser with identical test conditions —
-          same DOM structure, same scroll patterns, same measurement pipeline.
-          Select a library to begin.
-        </p>
-        <div class="bench-overview__meta">
-          <span class="bench-tag">
-            ${navigator === undefined ? "" : ""}${count} libraries
-          </span>
-          <span class="bench-tag">4 metrics per run</span>
-          <span class="bench-tag">7 scroll speeds</span>
-          <span class="bench-tag">Crowdsourced results</span>
-        </div>
-      </header>
-
-      ${sections.join("")}
-
-      <div class="bench-overview__methodology">
-        <h3 class="bench-overview__methodology-title">Methodology</h3>
-        <p class="bench-overview__methodology-desc">
-          All benchmarks follow identical methodology. Execution order is randomized per run
-          to eliminate GC bleed and JIT warmth bias. GC barriers are placed between runs.
-          All libraries render the same 7-element DOM template per item.
-        </p>
-        <a href="/methodology" class="bench-overview__methodology-link">Read the full methodology →</a>
-      </div>
-    </div>`;
+function buildEcosystemData() {
+  if (_ecosystemData) return _ecosystemData;
+  _ecosystemData = _buildEcosystemData();
+  return _ecosystemData;
 }
 
-// =============================================================================
-// Individual Library Benchmark Page
-// =============================================================================
-
-function buildSidebar(activeSlug: string | null): string {
+function _buildEcosystemData() {
   const byEcosystem = getLibrariesByEcosystem();
-
-  const ecosystemOrder: Ecosystem[] = [
-    "react",
-    "vue",
-    "solid",
-    "svelte",
-    "vanilla",
-    "multi",
-  ];
-
-  const groups: string[] = [];
-
-  for (const eco of ecosystemOrder) {
-    const libs = byEcosystem.get(eco);
-    if (!libs || libs.length === 0) continue;
-
-    const label = getEcosystemLabel(eco);
-    const items = libs
-      .map((lib) => {
-        const isActive = lib.slug === activeSlug;
-        const classes = `sidebar__link${isActive ? " sidebar__link--active" : ""}`;
-        return `<a href="/benchmarks/${lib.slug}" class="${classes}">${escapeHtml(lib.name)}</a>`;
-      })
-      .join("\n          ");
-
-    groups.push(`
-        <div class="sidebar__group">
-          <div class="sidebar__group-label">${escapeHtml(label)}</div>
-          ${items}
-        </div>`);
-  }
-
-  // Overview link
-  const overviewActive = activeSlug === null;
-  const overviewClass = `sidebar__link${overviewActive ? " sidebar__link--active" : ""}`;
-
-  return `
-    <aside class="sidebar">
-      <a href="/benchmarks" class="${overviewClass}">Overview</a>
-      ${groups.join("")}
-    </aside>`;
+  return ECOSYSTEM_ORDER.map((eco) => ({
+    label: getEcosystemLabel(eco),
+    libs: (byEcosystem.get(eco) ?? []).map((lib) => ({
+      slug: lib.slug,
+      name: lib.name,
+      tagline: lib.tagline,
+      npm: lib.npm,
+      npmUrl: lib.npmUrl,
+      github: lib.github,
+      homepage: lib.homepage,
+      ecosystem: lib.ecosystem,
+    })),
+  })).filter((g) => g.libs.length > 0);
 }
 
-function buildLibraryPageContent(lib: LibraryInfo): string {
-  // Item count buttons
-  const sizeButtons = ITEM_COUNTS.map(
-    (count) =>
-      `<button class="ui-segmented__btn${count === INITIAL_ITEM_COUNT ? " ui-segmented__btn--active" : ""}" data-count="${count}">${formatItemCount(count)}</button>`,
-  ).join("");
-
-  // Stress level buttons
-  const stressButtons = STRESS_LEVELS.map(
-    (level, i) =>
-      `<button class="ui-segmented__btn bench-stress-btn${i === 0 ? " ui-segmented__btn--active" : ""}" data-stress="${level.ms}" title="${level.ms === 0 ? "No extra CPU load" : `Burn ${level.ms}ms of CPU per frame during scroll`}">${level.label}</button>`,
-  ).join("");
-
-  // Chrome detection note
-  const chromeNote = `<span class="bench-tag" id="bench-chrome-tag"></span>`;
-
-  return `
-    <div class="bench-page" data-library="${escapeHtml(lib.slug)}">
-      <!-- Header -->
-      <header class="bench-header">
-        <div class="bench-header__top">
-          <h1 class="bench-header__title">${escapeHtml(lib.name)}</h1>
-          <div class="bench-header__links">
-            <a href="${escapeHtml(lib.npmUrl)}" class="bench-header__ext-link" target="_blank" rel="noopener noreferrer">npm</a>
-            <a href="${escapeHtml(lib.github)}" class="bench-header__ext-link" target="_blank" rel="noopener noreferrer">GitHub</a>
-            ${lib.homepage ? `<a href="${escapeHtml(lib.homepage)}" class="bench-header__ext-link" target="_blank" rel="noopener noreferrer">Docs</a>` : ""}
-          </div>
-        </div>
-        <p class="bench-header__desc">${escapeHtml(lib.tagline)}</p>
-        <div class="bench-header__meta">
-          <span class="bench-tag bench-tag--accent">${escapeHtml(lib.ecosystem)}</span>
-          <span class="bench-tag"><code>${escapeHtml(lib.npm)}</code></span>
-          ${chromeNote}
-          <span class="bench-tag" id="bench-cpu-tag"></span>
-        </div>
-      </header>
-
-      <!-- Controls -->
-      <div class="bench-controls" id="bench-controls">
-        <span class="bench-controls__label">Items</span>
-        <div class="ui-segmented" id="bench-sizes">
-          ${sizeButtons}
-        </div>
-
-        <div class="bench-controls__sep"></div>
-        <span class="bench-controls__label">Stress ms</span>
-        <div class="ui-segmented" id="bench-stress">
-          ${stressButtons}
-        </div>
-
-        <div class="bench-controls__sep"></div>
-        <button class="ui-btn ui-btn--primary" id="bench-run">▶ Run</button>
-      </div>
-
-      <!-- Benchmark Result Area -->
-      <div class="bench-suites" id="bench-suites"></div>
-
-      <!-- Viewport (visible during benchmark execution) -->
-      <div class="bench-viewport" id="bench-viewport">
-        <div class="bench-viewport__inner" id="bench-viewport-inner"></div>
-        <div class="bench-viewport__label">Live Preview</div>
-      </div>
-    </div>`;
+function htmlHeaders(): ResponseInit {
+  return {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": IS_PROD
+        ? "public, max-age=3600, must-revalidate"
+        : "no-cache, no-store, must-revalidate",
+    },
+  };
 }
 
 // =============================================================================
 // Page Assembly
 // =============================================================================
 
-function assembleOverviewPage(): string {
-  const content = buildOverviewContent();
-  const sidebar = buildSidebar(null);
+function assembleOverviewPage(locale: string): string {
+  const t = makeT(locale, "benchmarks");
+  const count = getLibraryCount();
+  const ecosystems = buildEcosystemData();
+
+  // Render overview content
+  const overviewContent = renderTemplate("benchmarks-overview", {
+    t,
+    count,
+    ecosystems,
+  });
+
+  // Render sidebar
+  const sidebar = renderTemplate("benchmarks-sidebar", {
+    t,
+    ecosystems,
+    activeSlug: null,
+  });
 
   return renderShell({
-    title: "Benchmarks — virtuallist.io",
-    description:
-      "Live performance benchmarks for virtual list libraries. " +
-      "Compare render time, memory usage, scroll FPS, and P95 frame time across " +
-      "React, Vue, SolidJS, Svelte, and Vanilla JS implementations.",
+    locale,
+    title: t("meta.overview_title"),
+    description: t("meta.overview_description"),
     url: `${SITE}/benchmarks`,
     content: `
       <div class="bench-layout">
         ${sidebar}
         <div class="bench-layout__content">
-          ${content}
+          ${overviewContent}
         </div>
       </div>`,
+    t,
     activeNav: "benchmarks",
     extraHead: `<style>${BENCH_CSS}</style>`,
+    extraBody: "",
+    mainClass: "",
   });
 }
 
-function assembleLibraryPage(lib: LibraryInfo): string {
-  const content = buildLibraryPageContent(lib);
-  const sidebar = buildSidebar(lib.slug);
+function assembleLibraryPage(lib: LibraryInfo, locale: string): string {
+  const t = makeT(locale, "benchmarks");
+  const ecosystems = buildEcosystemData();
+
+  // Render library page content
+  const libraryContent = renderTemplate("benchmarks-library", {
+    t,
+    lib,
+    itemCounts: ITEM_COUNTS,
+    initialItemCount: INITIAL_ITEM_COUNT,
+    stressLevels: STRESS_LEVELS,
+    formatItemCount,
+  });
+
+  // Render sidebar
+  const sidebar = renderTemplate("benchmarks-sidebar", {
+    t,
+    ecosystems,
+    activeSlug: lib.slug,
+  });
 
   return renderShell({
-    title: `${lib.name} Benchmark — virtuallist.io`,
-    description:
-      `Live performance benchmark for ${lib.name}. ` +
-      `Measure render time, memory usage, scroll FPS, and P95 frame time ` +
-      `with ${lib.npm} in your browser.`,
+    locale,
+    title: t("meta.library_title", { name: lib.name }),
+    description: t("meta.library_description", {
+      name: lib.name,
+      npm: lib.npm,
+    }),
     url: `${SITE}/benchmarks/${lib.slug}`,
     content: `
       <div class="bench-layout">
         ${sidebar}
         <div class="bench-layout__content">
-          ${content}
+          ${libraryContent}
         </div>
       </div>`,
+    t,
     activeNav: "benchmarks",
     extraHead: `<style>${BENCH_CSS}</style>`,
     extraBody: `<script type="module" src="/dist/benchmarks/script.js"></script>`,
+    mainClass: "",
   });
 }
 
@@ -330,46 +196,37 @@ function assembleLibraryPage(lib: LibraryInfo): string {
  * Render a benchmark page.
  *
  * @param slug - Library slug, or null for the overview page.
+ * @param req  - HTTP request (for locale detection).
  * @returns Response or null if the slug doesn't match any library.
  */
-export function renderBenchmarkPage(slug: string | null): Response | null {
-  const cacheKey = slug ?? "__overview__";
+export function renderBenchmarkPage(
+  slug: string | null,
+  req: Request,
+): Response | null {
+  const locale = detectLocale(req);
+  const cacheKey = `${locale}/${slug ?? "__overview__"}`;
 
   // Return cached page in production
   if (IS_PROD) {
     const cached = pageCache.get(cacheKey);
     if (cached !== undefined) {
-      return new Response(cached, {
-        headers: {
-          "Content-Type": "text/html; charset=utf-8",
-          "Cache-Control": "public, max-age=3600, must-revalidate",
-        },
-      });
+      return new Response(cached, htmlHeaders());
     }
   }
 
   let html: string;
 
   if (slug === null) {
-    // Overview page
-    html = assembleOverviewPage();
+    html = assembleOverviewPage(locale);
   } else {
-    // Individual library page — validate the slug
     const lib = getLibrary(slug);
     if (!lib || !lib.enabled) return null;
-    html = assembleLibraryPage(lib);
+    html = assembleLibraryPage(lib, locale);
   }
 
   pageCache.set(cacheKey, html);
 
-  return new Response(html, {
-    headers: {
-      "Content-Type": "text/html; charset=utf-8",
-      "Cache-Control": IS_PROD
-        ? "public, max-age=3600, must-revalidate"
-        : "no-cache, no-store, must-revalidate",
-    },
-  });
+  return new Response(html, htmlHeaders());
 }
 
 // =============================================================================

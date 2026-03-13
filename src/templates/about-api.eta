@@ -1,0 +1,168 @@
+<div class="about-page">
+  <header class="about-header">
+    <h1 class="about-header__title"><%= it.t("api.title") %></h1>
+    <p class="about-header__subtitle"><%~ it.t("api.subtitle") %></p>
+  </header>
+
+  <section class="about-section">
+    <h2 class="about-section__title"><%= it.t("api.base_title") %></h2>
+    <pre class="about-pre">https://virtuallist.io/api</pre>
+    <p class="about-text"><%~ it.t("api.cors_note") %></p>
+  </section>
+
+  <section class="about-section">
+    <h2 class="about-section__title"><%= it.t("api.endpoints_title") %></h2>
+
+    <div class="api-endpoint">
+      <div class="api-endpoint__header">
+        <span class="api-method api-method--get">GET</span>
+        <code class="api-path">/api/benchmarks/stats</code>
+      </div>
+      <p class="api-desc"><%~ it.t("api.stats_desc") %></p>
+      <div class="api-params">
+        <div class="api-param">
+          <code class="api-param__name">librarySlug</code>
+          <span class="api-param__desc"><%~ it.t("api.stats_param_slug") %></span>
+        </div>
+        <div class="api-param">
+          <code class="api-param__name">itemCount</code>
+          <span class="api-param__desc"><%~ it.t("api.stats_param_count") %></span>
+        </div>
+        <div class="api-param">
+          <code class="api-param__name">libraryVersion</code>
+          <span class="api-param__desc"><%~ it.t("api.stats_param_version") %></span>
+        </div>
+        <div class="api-param">
+          <code class="api-param__name">stressMs</code>
+          <span class="api-param__desc"><%~ it.t("api.stats_param_stress") %></span>
+        </div>
+      </div>
+      <pre class="about-pre">GET /api/benchmarks/stats?librarySlug=react-window&amp;itemCount=10000
+
+{
+  "items": [
+    {
+      "librarySlug": "react-window",
+      "libraryVersion": "1.8.10",
+      "itemCount": 10000,
+      "totalRuns": 47,
+      "metrics": [
+        {
+          "label": "Render",
+          "unit": "ms",
+          "better": "lower",
+          "median": 8.7,
+          "mean": 9.1,
+          "p5": 6.9,
+          "p95": 14.2,
+          "stddev": 2.1,
+          "sampleCount": 47
+        }
+      ]
+    }
+  ],
+  "total": 1
+}</pre>
+    </div>
+
+    <div class="api-endpoint">
+      <div class="api-endpoint__header">
+        <span class="api-method api-method--get">GET</span>
+        <code class="api-path">/api/benchmarks/history</code>
+      </div>
+      <p class="api-desc"><%~ it.t("api.history_desc") %></p>
+      <div class="api-params">
+        <div class="api-param">
+          <code class="api-param__name">librarySlug</code>
+          <span class="api-param__req">required</span>
+          <span class="api-param__desc"><%~ it.t("api.history_param_slug") %></span>
+        </div>
+        <div class="api-param">
+          <code class="api-param__name">metric</code>
+          <span class="api-param__req">required</span>
+          <span class="api-param__desc"><%~ it.t("api.history_param_metric") %></span>
+        </div>
+        <div class="api-param">
+          <code class="api-param__name">days</code>
+          <span class="api-param__desc"><%~ it.t("api.history_param_days") %></span>
+        </div>
+        <div class="api-param">
+          <code class="api-param__name">itemCount</code>
+          <span class="api-param__desc"><%~ it.t("api.history_param_count") %></span>
+        </div>
+      </div>
+      <pre class="about-pre">GET /api/benchmarks/history?librarySlug=react-window&amp;metric=Render
+
+{
+  "items": [
+    {
+      "date": "2025-01-14",
+      "libraryVersion": "1.8.10",
+      "median": 8.5,
+      "mean": 8.9,
+      "p5": 7.1,
+      "p95": 12.3,
+      "sampleCount": 12
+    }
+  ],
+  "total": 1
+}</pre>
+    </div>
+
+    <div class="api-endpoint">
+      <div class="api-endpoint__header">
+        <span class="api-method api-method--get">GET</span>
+        <code class="api-path">/api/benchmarks/libraries</code>
+      </div>
+      <p class="api-desc"><%~ it.t("api.libraries_desc") %></p>
+      <pre class="about-pre">GET /api/benchmarks/libraries
+
+{
+  "items": [
+    {
+      "librarySlug": "react-window",
+      "libraryVersion": "1.8.10",
+      "totalRuns": 47,
+      "lastSeen": "2025-01-15 11:42:00"
+    }
+  ],
+  "total": 1
+}</pre>
+    </div>
+
+    <div class="api-endpoint">
+      <div class="api-endpoint__header">
+        <span class="api-method api-method--get">GET</span>
+        <code class="api-path">/api/benchmarks/summary</code>
+      </div>
+      <p class="api-desc"><%~ it.t("api.summary_desc") %></p>
+    </div>
+
+    <div class="api-endpoint">
+      <div class="api-endpoint__header">
+        <span class="api-method api-method--get">GET</span>
+        <code class="api-path">/api/benchmarks/browsers</code>
+      </div>
+      <p class="api-desc"><%~ it.t("api.browsers_desc") %></p>
+    </div>
+
+    <div class="api-endpoint">
+      <div class="api-endpoint__header">
+        <span class="api-method api-method--get">GET</span>
+        <code class="api-path">/api/health</code>
+      </div>
+      <p class="api-desc"><%~ it.t("api.health_desc") %></p>
+      <pre class="about-pre">{ "status": "ok", "timestamp": "2025-01-15T12:00:00.000Z" }</pre>
+    </div>
+  </section>
+
+  <section class="about-section">
+    <h2 class="about-section__title"><%= it.t("api.ratelimit_title") %></h2>
+    <p class="about-text"><%~ it.t("api.ratelimit_p") %></p>
+  </section>
+
+  <section class="about-section">
+    <h2 class="about-section__title"><%= it.t("api.caching_title") %></h2>
+    <p class="about-text"><%~ it.t("api.caching_p") %></p>
+  </section>
+</div>

@@ -5,267 +5,131 @@
 //   - Hero section with tagline and CTA
 //   - Library grid showing all benchmarked libraries by ecosystem
 //   - Feature highlights (methodology, crowdsourced data, open source)
-//   - Quick stats
+//   - How it works steps
+//
+// All HTML lives in src/templates/home.eta.
+// All user-facing strings live in locales/{locale}/home.json + common.json.
+// This file is logic only: data collection + template rendering.
 
-import { SITE } from "../config";
+import { SITE, IS_PROD } from "../config";
+import { renderTemplate } from "../eta";
 import { renderShell } from "../shell";
+import { makeT, detectLocale, type Locale } from "../i18n";
 import {
-  getLibraries,
   getLibrariesByEcosystem,
   getEcosystemLabel,
   getLibraryCount,
-  type LibraryInfo,
   type Ecosystem,
 } from "../registry";
 
 // =============================================================================
-// Cache
+// Cache (keyed by locale for multi-language support)
 // =============================================================================
 
-let cachedHtml: string | null = null;
+const pageCache = new Map<Locale, string>();
 
 export function clearHomeCache(): void {
-  cachedHtml = null;
+  pageCache.clear();
 }
 
 // =============================================================================
-// Content Builders
+// Data
 // =============================================================================
 
-function buildHero(): string {
-  const count = getLibraryCount();
+const FEATURES = [
+  { icon: "🎯", titleKey: "fair_title", descKey: "fair_desc" },
+  { icon: "🌍", titleKey: "crowdsourced_title", descKey: "crowdsourced_desc" },
+  { icon: "📊", titleKey: "metrics_title", descKey: "metrics_desc" },
+  { icon: "🔬", titleKey: "stress_title", descKey: "stress_desc" },
+  { icon: "⚡", titleKey: "speeds_title", descKey: "speeds_desc" },
+  { icon: "🔓", titleKey: "open_title", descKey: "open_desc" },
+];
 
-  return `
-    <section class="hero">
-      <div class="hero__inner">
-        <div class="hero__badge">Open Source · Independent · Transparent</div>
-        <h1 class="hero__title">Virtual List<br>Benchmarks</h1>
-        <p class="hero__subtitle">
-          Fair, transparent performance benchmarks for <strong>${count} virtual list libraries</strong>
-          across React, Vue, SolidJS, Svelte, and Vanilla JS.
-          Every benchmark runs live in your browser — no pre-recorded results, no bias.
-        </p>
-        <div class="hero__actions">
-          <a href="/benchmarks" class="hero__btn hero__btn--primary">Run Benchmarks</a>
-          <a href="/methodology" class="hero__btn hero__btn--secondary">Methodology</a>
-        </div>
-      </div>
-    </section>`;
-}
+const STEPS = [
+  { titleKey: "step1_title", descKey: "step1_desc" },
+  { titleKey: "step2_title", descKey: "step2_desc" },
+  { titleKey: "step3_title", descKey: "step3_desc" },
+  { titleKey: "step4_title", descKey: "step4_desc" },
+];
 
-function buildLibraryCard(lib: LibraryInfo): string {
-  return `
-        <a href="/benchmarks/${lib.slug}" class="lib-card">
-          <div class="lib-card__header">
-            <span class="lib-card__name">${escapeHtml(lib.name)}</span>
-          </div>
-          <p class="lib-card__tagline">${escapeHtml(lib.tagline)}</p>
-          <div class="lib-card__links">
-            <span class="lib-card__npm">${escapeHtml(lib.npm)}</span>
-          </div>
-        </a>`;
-}
-
-function buildLibraryGrid(): string {
-  const byEcosystem = getLibrariesByEcosystem();
-
-  // Render order for ecosystems
-  const ecosystemOrder: Ecosystem[] = [
-    "react",
-    "vue",
-    "solid",
-    "svelte",
-    "vanilla",
-    "multi",
-  ];
-
-  const sections: string[] = [];
-
-  for (const eco of ecosystemOrder) {
-    const libs = byEcosystem.get(eco);
-    if (!libs || libs.length === 0) continue;
-
-    const label = getEcosystemLabel(eco);
-    const cards = libs.map(buildLibraryCard).join("");
-
-    sections.push(`
-      <div class="libs__ecosystem">
-        <h3 class="libs__ecosystem-label">${label}</h3>
-        <div class="libs__grid">
-          ${cards}
-        </div>
-      </div>`);
-  }
-
-  return `
-    <section class="libs">
-      <div class="libs__inner">
-        <h2 class="section-title">Libraries</h2>
-        <p class="section-desc">
-          Every library is treated equally — same test conditions, same DOM structure, same measurement pipeline.
-          Click any library to run its benchmark.
-        </p>
-        ${sections.join("")}
-      </div>
-    </section>`;
-}
-
-function buildFeatures(): string {
-  return `
-    <section class="features">
-      <div class="features__inner">
-        <h2 class="section-title">Why virtuallist.io?</h2>
-        <div class="features__grid">
-
-          <div class="feature-card">
-            <div class="feature-card__icon">🎯</div>
-            <h3 class="feature-card__title">Fair Methodology</h3>
-            <p class="feature-card__desc">
-              Randomized execution order, GC barriers between runs, identical DOM templates.
-              No library gets an unfair advantage from JIT warmth or GC timing.
-            </p>
-          </div>
-
-          <div class="feature-card">
-            <div class="feature-card__icon">🌍</div>
-            <h3 class="feature-card__title">Crowdsourced Data</h3>
-            <p class="feature-card__desc">
-              Every benchmark run is automatically stored and aggregated.
-              See real-world performance across different hardware, browsers, and versions.
-            </p>
-          </div>
-
-          <div class="feature-card">
-            <div class="feature-card__icon">📊</div>
-            <h3 class="feature-card__title">4 Key Metrics</h3>
-            <p class="feature-card__desc">
-              Initial render time, memory usage, scroll FPS, and P95 frame time.
-              Comprehensive performance profiling in under 30 seconds.
-            </p>
-          </div>
-
-          <div class="feature-card">
-            <div class="feature-card__icon">🔬</div>
-            <h3 class="feature-card__title">Stress Testing</h3>
-            <p class="feature-card__desc">
-              Simulate real application overhead by burning CPU per frame.
-              See which libraries hold up under pressure when your app does real work.
-            </p>
-          </div>
-
-          <div class="feature-card">
-            <div class="feature-card__icon">⚡</div>
-            <h3 class="feature-card__title">7 Scroll Speeds</h3>
-            <p class="feature-card__desc">
-              From 720 px/s crawl to 36,000 px/s extreme stress.
-              Progressive speed testing reveals performance cliffs invisible at a single speed.
-            </p>
-          </div>
-
-          <div class="feature-card">
-            <div class="feature-card__icon">🔓</div>
-            <h3 class="feature-card__title">Open Source</h3>
-            <p class="feature-card__desc">
-              Every line of measurement code is open for review.
-              Library authors are welcome to contribute and ensure fair representation.
-            </p>
-          </div>
-
-        </div>
-      </div>
-    </section>`;
-}
-
-function buildHowItWorks(): string {
-  return `
-    <section class="how-it-works">
-      <div class="how-it-works__inner">
-        <h2 class="section-title">How It Works</h2>
-        <div class="steps">
-          <div class="step">
-            <div class="step__number">1</div>
-            <div class="step__content">
-              <h3 class="step__title">Choose Libraries</h3>
-              <p class="step__desc">Select any library to benchmark it. Each benchmark tests the library in isolation.</p>
-            </div>
-          </div>
-          <div class="step">
-            <div class="step__number">2</div>
-            <div class="step__content">
-              <h3 class="step__title">Run in Your Browser</h3>
-              <p class="step__desc">Benchmarks execute live using real DOM operations — no simulated or pre-recorded data.</p>
-            </div>
-          </div>
-          <div class="step">
-            <div class="step__number">3</div>
-            <div class="step__content">
-              <h3 class="step__title">Compare Results</h3>
-              <p class="step__desc">View side-by-side metrics with percentage differences and quality ratings.</p>
-            </div>
-          </div>
-          <div class="step">
-            <div class="step__number">4</div>
-            <div class="step__content">
-              <h3 class="step__title">Contribute Data</h3>
-              <p class="step__desc">Results are automatically stored for crowdsourced aggregation across devices and browsers.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>`;
-}
-
-// =============================================================================
-// Page Assembly
-// =============================================================================
-
-function buildPageContent(): string {
-  return [
-    buildHero(),
-    buildLibraryGrid(),
-    buildFeatures(),
-    buildHowItWorks(),
-  ].join("\n");
-}
+const ECOSYSTEM_ORDER: Ecosystem[] = [
+  "react",
+  "vue",
+  "solid",
+  "svelte",
+  "vanilla",
+  "multi",
+];
 
 // =============================================================================
 // Public API
 // =============================================================================
 
-export function renderHomepage(): Response {
-  if (!cachedHtml) {
-    const content = buildPageContent();
+export function renderHomepage(req: Request): Response {
+  const locale = detectLocale(req);
 
-    cachedHtml = renderShell({
-      title: "virtuallist.io — Independent Virtual List Benchmarks",
-      description:
-        "Fair, transparent performance benchmarks for virtual list libraries. " +
-        "Compare React, Vue, SolidJS, Svelte, and Vanilla JS implementations with live browser tests.",
-      url: `${SITE}/`,
-      content,
-      activeNav: undefined,
-      extraHead: `<style>${HOME_CSS}</style>`,
-    });
+  if (IS_PROD && pageCache.has(locale)) {
+    return new Response(pageCache.get(locale)!, htmlHeaders());
   }
 
-  return new Response(cachedHtml, {
-    headers: {
-      "Content-Type": "text/html; charset=utf-8",
-      "Cache-Control": "public, max-age=3600, must-revalidate",
-    },
+  const t = makeT(locale, "home");
+
+  // Build ecosystem data for the template
+  const byEcosystem = getLibrariesByEcosystem();
+  const count = getLibraryCount();
+
+  const ecosystems = ECOSYSTEM_ORDER.map((eco) => ({
+    label: getEcosystemLabel(eco),
+    libs: (byEcosystem.get(eco) ?? []).map((lib) => ({
+      slug: lib.slug,
+      name: lib.name,
+      tagline: lib.tagline,
+      npm: lib.npm,
+    })),
+  })).filter((g) => g.libs.length > 0);
+
+  // Render page content via Eta
+  const content = renderTemplate("home", {
+    t,
+    ecosystems,
+    features: FEATURES,
+    steps: STEPS,
+    count,
   });
+
+  // Wrap in shell
+  const html = renderShell({
+    locale,
+    title: t("meta.title"),
+    description: t("meta.description"),
+    url: `${SITE}/`,
+    content,
+    t,
+    ogType: "website",
+    activeNav: undefined,
+    mainClass: "",
+    extraHead: `<style>${HOME_CSS}</style>`,
+    extraBody: "",
+  });
+
+  if (IS_PROD) pageCache.set(locale, html);
+
+  return new Response(html, htmlHeaders());
 }
 
 // =============================================================================
 // Helpers
 // =============================================================================
 
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+function htmlHeaders(): ResponseInit {
+  return {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": IS_PROD
+        ? "public, max-age=3600, must-revalidate"
+        : "no-cache, no-store, must-revalidate",
+    },
+  };
 }
 
 // =============================================================================

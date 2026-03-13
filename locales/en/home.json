@@ -1,0 +1,43 @@
+{
+  "meta": {
+    "title": "virtuallist.io — Independent Virtual List Benchmarks",
+    "description": "Fair, transparent performance benchmarks for virtual list libraries. Compare React, Vue, SolidJS, Svelte, and Vanilla JS implementations with live browser tests."
+  },
+  "hero": {
+    "badge": "Open Source · Independent · Transparent",
+    "title": "Virtual List\nBenchmarks",
+    "subtitle": "Fair, transparent performance benchmarks for <strong>{count} virtual list libraries</strong> across React, Vue, SolidJS, Svelte, and Vanilla JS. Every benchmark runs live in your browser — no pre-recorded results, no bias.",
+    "cta_primary": "Run Benchmarks",
+    "cta_secondary": "Methodology"
+  },
+  "libraries": {
+    "title": "Libraries",
+    "desc": "Every library is treated equally — same test conditions, same DOM structure, same measurement pipeline. Click any library to run its benchmark."
+  },
+  "features": {
+    "title": "Why virtuallist.io?",
+    "fair_title": "Fair Methodology",
+    "fair_desc": "Randomized execution order, GC barriers between runs, identical DOM templates. No library gets an unfair advantage from JIT warmth or GC timing.",
+    "crowdsourced_title": "Crowdsourced Data",
+    "crowdsourced_desc": "Every benchmark run is automatically stored and aggregated. See real-world performance across different hardware, browsers, and versions.",
+    "metrics_title": "4 Key Metrics",
+    "metrics_desc": "Initial render time, memory usage, scroll FPS, and P95 frame time. Comprehensive performance profiling in under 30 seconds.",
+    "stress_title": "Stress Testing",
+    "stress_desc": "Simulate real application overhead by burning CPU per frame. See which libraries hold up under pressure when your app does real work.",
+    "speeds_title": "7 Scroll Speeds",
+    "speeds_desc": "From 720 px/s crawl to 36,000 px/s extreme stress. Progressive speed testing reveals performance cliffs invisible at a single speed.",
+    "open_title": "Open Source",
+    "open_desc": "Every line of measurement code is open for review. Library authors are welcome to contribute and ensure fair representation."
+  },
+  "how": {
+    "title": "How It Works",
+    "step1_title": "Choose Libraries",
+    "step1_desc": "Select any library to benchmark it. Each benchmark tests the library in isolation.",
+    "step2_title": "Run in Your Browser",
+    "step2_desc": "Benchmarks execute live using real DOM operations — no simulated or pre-recorded data.",
+    "step3_title": "Compare Results",
+    "step3_desc": "View side-by-side metrics with percentage differences and quality ratings.",
+    "step4_title": "Contribute Data",
+    "step4_desc": "Results are automatically stored for crowdsourced aggregation across devices and browsers."
+  }
+}

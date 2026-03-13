@@ -1,0 +1,32 @@
+{
+  "nav": {
+    "benchmarks": "Benchmarks",
+    "methodology": "Methodology",
+    "about": "About",
+    "github_label": "GitHub repository"
+  },
+  "footer": {
+    "tagline": "Independent, open-source benchmark platform for virtual list libraries.",
+    "disclaimer": "All benchmarks run locally in your browser. Results depend on your hardware.",
+    "link_methodology": "Methodology",
+    "link_about": "About",
+    "link_contribute": "Contribute",
+    "link_api": "API",
+    "link_github": "GitHub"
+  },
+  "bench_tag": {
+    "libraries": "{count} libraries",
+    "metrics": "4 metrics per run",
+    "scroll_speeds": "7 scroll speeds",
+    "crowdsourced": "Crowdsourced results"
+  },
+  "controls": {
+    "items_label": "Items",
+    "stress_label": "Stress ms",
+    "run": "▶ Run",
+    "stop": "■ Stop"
+  },
+  "chrome_tag_full": "Chrome — full metrics",
+  "chrome_tag_warning": "⚠️ Use Chrome for memory metrics",
+  "cpu_tag": "{cores}-core CPU"
+}

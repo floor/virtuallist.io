@@ -1,10 +1,14 @@
 # Refactor: i18n Architecture
 
 > Internal spec. Do not publish.
+>
+> **Status:** Steps 1–6 complete ✅ — implemented on branch `refactor/i18n-architecture`.
+> Steps 7–8 (translation pipeline, Phase 2 URL routing) are deferred.
 
-This document describes the complete refactor required to move virtuallist.io from
-TypeScript string templates to an Eta + JSON locale architecture that supports
-multiple languages.
+This document describes the refactor that moved virtuallist.io from TypeScript
+string templates to an Eta + JSON locale architecture that supports multiple
+languages. It was originally a planning spec and now reflects what was actually
+built.
 
 ---
 
@@ -37,45 +41,50 @@ src/server/pages/about.ts       locales/en/about.json     ← translatable strin
 virtuallist.io/
 ├── locales/
 │   ├── en/
-│   │   ├── common.json        ← nav, footer, shared UI strings
-│   │   ├── home.json
-│   │   ├── benchmarks.json
-│   │   ├── methodology.json
-│   │   └── about.json         ← covers /about, /about/api, /about/contribute
+│   │   ├── common.json        ← nav, footer, shared UI strings (22 keys)
+│   │   ├── home.json          ← (31 keys)
+│   │   ├── benchmarks.json    ← (11 keys)
+│   │   ├── methodology.json   ← (153 keys)
+│   │   └── about.json         ← covers /about, /about/api, /about/contribute (90 keys)
 │   └── fr/                    ← added later, same file names
 │       ├── common.json
 │       ├── home.json
 │       └── ...
 │
 ├── src/
-│   ├── templates/             ← NEW: Eta template files
-│   │   ├── shell.eta          ← replaces shell.ts buildNav/buildFooter HTML
+│   ├── templates/             ← Eta template files (10 total)
+│   │   ├── shell.eta          ← outer HTML document, nav, footer
 │   │   ├── home.eta
 │   │   ├── benchmarks-overview.eta
 │   │   ├── benchmarks-library.eta
+│   │   ├── benchmarks-sidebar.eta ← shared sidebar for benchmark pages
 │   │   ├── methodology.eta
 │   │   ├── about.eta
 │   │   ├── about-api.eta
-│   │   └── about-contribute.eta
+│   │   ├── about-contribute.eta
+│   │   └── about-sidebar.eta  ← shared sidebar for about pages
 │   │
 │   ├── server/
-│   │   ├── i18n.ts            ← NEW: locale loader + t() function
-│   │   ├── shell.ts           ← keeps logic (critical CSS, ShellOptions); removes HTML strings
+│   │   ├── i18n.ts            ← locale loader + makeT() factory
+│   │   ├── eta.ts             ← Eta singleton + renderTemplate()
+│   │   ├── shell.ts           ← logic only: CRITICAL_CSS, NAV_ITEMS, renderShell()
 │   │   ├── config.ts          ← unchanged
-│   │   ├── router.ts          ← add locale detection from Accept-Language / URL prefix
+│   │   ├── router.ts          ← passes req to all page renderers
 │   │   ├── registry.ts        ← unchanged
 │   │   ├── static.ts          ← unchanged
-│   │   ├── sitemap.ts         ← update for language-prefixed URLs
+│   │   ├── sitemap.ts         ← unchanged (Phase 2: language-prefixed URLs)
 │   │   └── pages/
-│   │       ├── home.ts        ← logic only: getLibraryCount(), pass data to template
-│   │       ├── benchmarks.ts  ← logic only: registry lookups, pass data to template
-│   │       ├── methodology.ts ← logic only: passes locale strings to template
-│   │       └── about.ts       ← logic only: passes locale strings to template
+│   │       ├── home.ts        ← logic only: data + renderTemplate("home", …)
+│   │       ├── benchmarks.ts  ← logic only: data + renderTemplate("benchmarks-*", …)
+│   │       ├── methodology.ts ← logic only: renderTemplate("methodology", …)
+│   │       └── about.ts       ← logic only: renderTemplate("about*", …)
 ```
 
 ---
 
-## Step 1 — Locale JSON files
+## Step 1 — Locale JSON files ✅
+
+> Implemented: 5 JSON files in `locales/en/`, 307 keys total.
 
 ### Naming convention
 
@@ -516,7 +525,9 @@ Covers all three sub-pages (`/about`, `/about/api`, `/about/contribute`).
 
 ---
 
-## Step 2 — i18n loader (`src/server/i18n.ts`)
+## Step 2 — i18n loader (`src/server/i18n.ts`) ✅
+
+> Implemented in `src/server/i18n.ts` (226 lines).
 
 This module is responsible for:
 1. Loading the correct locale JSON files at server startup
@@ -524,255 +535,42 @@ This module is responsible for:
 3. Detecting the requested language from the HTTP request
 4. Falling back to `en` for any missing key
 
-```typescript
-// src/server/i18n.ts
+**Key design decisions (differs from original spec):**
 
-import { readFileSync, existsSync } from "fs";
-import { resolve, join } from "path";
+- **Single `t` per request** — both the shell and page content receive the same
+  `t()` function from `makeT(locale, namespace)`. Since `makeT` already falls
+  through from page namespace → common, the shell doesn't need a separate
+  `tCommon`. This means fewer `makeT()` calls per request, and if a page ever
+  needs to override a common key, it just works.
+- **`commonMessages` identity check** — when `namespace === "common"`, `makeT`
+  skips loading common a second time (sets `commonMessages = pageMessages`).
+- **Missing key warning** — only logs in non-production to avoid noise in prod.
 
-// =============================================================================
-// Types
-// =============================================================================
-
-export type Locale = string; // "en", "fr", "de", "pt-BR", …
-
-/** Flat or one-level-deep string map */
-export type Messages = Record<string, string | Record<string, string>>;
-
-/** Page namespace — corresponds to a JSON file name */
-export type Namespace =
-  | "common"
-  | "home"
-  | "benchmarks"
-  | "methodology"
-  | "about";
-
-/** Merged messages for one request: common + page namespace */
-export type T = (key: string, vars?: Record<string, string | number>) => string;
-
-// =============================================================================
-// Constants
-// =============================================================================
-
-export const DEFAULT_LOCALE: Locale = "en";
-export const SUPPORTED_LOCALES: Locale[] = ["en"]; // extend as languages are added
-
-const LOCALES_DIR = resolve("./locales");
-
-// =============================================================================
-// In-memory cache
-// key: "{locale}/{namespace}" → Messages
-// =============================================================================
-
-const cache = new Map<string, Messages>();
-
-// =============================================================================
-// Loader
-// =============================================================================
-
-function loadMessages(locale: Locale, namespace: Namespace): Messages {
-  const key = `${locale}/${namespace}`;
-
-  if (cache.has(key)) return cache.get(key)!;
-
-  const filePath = join(LOCALES_DIR, locale, `${namespace}.json`);
-
-  if (!existsSync(filePath)) {
-    // Fall back to English silently
-    if (locale !== DEFAULT_LOCALE) {
-      return loadMessages(DEFAULT_LOCALE, namespace);
-    }
-    throw new Error(`Missing locale file: ${filePath}`);
-  }
-
-  const messages = JSON.parse(readFileSync(filePath, "utf-8")) as Messages;
-  cache.set(key, messages);
-  return messages;
-}
-
-/**
- * Preload all namespaces for a locale into the cache.
- * Call this at startup to avoid cold-read latency on first requests.
- */
-export function preloadLocale(locale: Locale): void {
-  const namespaces: Namespace[] = [
-    "common",
-    "home",
-    "benchmarks",
-    "methodology",
-    "about",
-  ];
-  for (const ns of namespaces) {
-    try {
-      loadMessages(locale, ns);
-    } catch {
-      // namespace file may not exist for a partially translated locale
-    }
-  }
-}
-
-/** Clear the entire message cache. Used in development to reflect edits. */
-export function clearI18nCache(): void {
-  cache.clear();
-}
-
-// =============================================================================
-// Locale detection
-// =============================================================================
-
-/**
- * Detect the preferred locale from an HTTP request.
- *
- * Priority order:
- *   1. URL prefix: /fr/benchmarks → "fr"  (not yet implemented — Phase 2)
- *   2. Cookie: locale=fr
- *   3. Accept-Language header: fr-FR,fr;q=0.9,en;q=0.8
- *   4. Default: "en"
- *
- * Only returns a locale that exists in SUPPORTED_LOCALES.
- */
-export function detectLocale(req: Request): Locale {
-  // 1. Cookie (fast path for returning visitors who switched language)
-  const cookie = req.headers.get("cookie") ?? "";
-  const cookieMatch = cookie.match(/(?:^|;\s*)locale=([a-z]{2}(?:-[A-Z]{2})?)/);
-  if (cookieMatch) {
-    const candidate = cookieMatch[1];
-    if (SUPPORTED_LOCALES.includes(candidate)) return candidate;
-  }
-
-  // 2. Accept-Language header
-  const acceptLang = req.headers.get("accept-language") ?? "";
-  for (const part of acceptLang.split(",")) {
-    const tag = part.split(";")[0].trim();
-    // Exact match first
-    if (SUPPORTED_LOCALES.includes(tag)) return tag;
-    // Language-only match (e.g. "fr" matches "fr-FR")
-    const lang = tag.split("-")[0];
-    if (SUPPORTED_LOCALES.includes(lang)) return lang;
-  }
-
-  return DEFAULT_LOCALE;
-}
-
-// =============================================================================
-// t() factory
-// =============================================================================
-
-/**
- * Build a translation function for a specific locale and page namespace.
- *
- * The returned t() function looks up keys in this priority:
- *   1. page namespace (e.g. "home")
- *   2. common namespace
- *   3. Returns the key itself as fallback (never throws)
- *
- * Keys can be dot-separated for one-level nesting: "hero.title"
- * Variables use {placeholder} syntax: t("hero.subtitle", { count: 13 })
- */
-export function makeT(locale: Locale, namespace: Namespace): T {
-  const pageMessages = loadMessages(locale, namespace);
-  const commonMessages = loadMessages(locale, "common");
-
-  return function t(
-    key: string,
-    vars?: Record<string, string | number>,
-  ): string {
-    // Dot-notation lookup (one level only)
-    const [section, field] = key.includes(".")
-      ? key.split(".", 2)
-      : [null, key];
-
-    let value: string | undefined;
-
-    if (section) {
-      const pageSection = pageMessages[section];
-      if (pageSection && typeof pageSection === "object") {
-        value = (pageSection as Record<string, string>)[field];
-      }
-      if (value === undefined) {
-        const commonSection = commonMessages[section];
-        if (commonSection && typeof commonSection === "object") {
-          value = (commonSection as Record<string, string>)[field];
-        }
-      }
-    } else {
-      value =
-        (typeof pageMessages[field] === "string"
-          ? (pageMessages[field] as string)
-          : undefined) ??
-        (typeof commonMessages[field] === "string"
-          ? (commonMessages[field] as string)
-          : undefined);
-    }
-
-    // Fallback to key
-    if (value === undefined) {
-      console.warn(`[i18n] Missing key: ${locale}/${namespace}/${key}`);
-      return key;
-    }
-
-    // Variable substitution
-    if (vars) {
-      return value.replace(
-        /\{(\w+)\}/g,
-        (_, name) => String(vars[name] ?? `{${name}}`),
-      );
-    }
-
-    return value;
-  };
-}
-```
+See `src/server/i18n.ts` for the full implementation.
 
 ---
 
-## Step 3 — Eta configuration (`src/server/eta.ts`)
+## Step 3 — Eta configuration (`src/server/eta.ts`) ✅
+
+> Implemented in `src/server/eta.ts` (64 lines). Using Eta v4.5.1 (latest).
 
 A singleton Eta instance configured once. Page renderers import `renderTemplate()`
 and pass it a template name, a `t()` function, and page-specific data.
 
-```typescript
-// src/server/eta.ts
+**Key design decisions (differs from original spec):**
 
-import { Eta } from "eta";
-import { resolve } from "path";
+- **`clearTemplateCache()`** uses the proper public Eta v4 API
+  (`eta.templatesSync.reset()` + `eta.templatesAsync.reset()`) instead of the
+  `(eta as any)` cast from the original spec. Both `templatesSync` and `reset()`
+  are typed in `Cacher<TemplateFunction>`.
 
-const TEMPLATES_DIR = resolve("./src/templates");
-
-/** Singleton Eta instance with file-based template loading and caching */
-const eta = new Eta({
-  views: TEMPLATES_DIR,
-  cache: true,          // compiled templates cached in memory across requests
-  rmWhitespace: false,  // preserve whitespace — important for readable HTML output
-  autoEscape: true,     // escape by default; use <%~ %> for trusted HTML
-  useWith: false,       // explicit `it.` prefix — no implicit scope pollution
-  varName: "it",
-});
-
-/**
- * Render a named template.
- *
- * @param name - Template file name without extension, e.g. "home"
- * @param data - Data object accessible as `it` in the template
- * @returns Rendered HTML string
- */
-export function renderTemplate(name: string, data: Record<string, unknown>): string {
-  return eta.render(name, data);
-}
-
-/**
- * Clear Eta's compiled template cache.
- * Call this in development when a .eta file changes.
- */
-export function clearTemplateCache(): void {
-  // Eta v4 exposes the internal cache via the instance
-  (eta as any).templatesSync.cache.clear?.();
-}
-```
+See `src/server/eta.ts` for the full implementation.
 
 ---
 
-## Step 4 — Eta templates (`src/templates/`)
+## Step 4 — Eta templates (`src/templates/`) ✅
+
+> Implemented: 10 template files in `src/templates/`.
 
 ### Template conventions
 
@@ -783,6 +581,25 @@ export function clearTemplateCache(): void {
   (`<strong>`, `<code>`, `<a>`) — use only for keys from trusted locale files
 - Dynamic values from the server: `it.count`, `it.libs`, `it.lib`, etc.
 - The `it.t()` function is the `T` built by `makeT()` for this request's locale
+
+### Template inventory
+
+| Template | Purpose |
+|----------|---------|
+| `shell.eta` | Outer HTML document: `<html>`, `<head>`, nav, `<main>`, footer |
+| `home.eta` | Hero, library grid, features, how-it-works |
+| `benchmarks-overview.eta` | Overview with library cards by ecosystem |
+| `benchmarks-library.eta` | Individual library benchmark page with controls |
+| `benchmarks-sidebar.eta` | Shared sidebar for benchmark pages |
+| `methodology.eta` | Full methodology documentation (367 lines) |
+| `about.eta` | /about — what-it-is, neutrality, crowdsourced, open-source, privacy |
+| `about-api.eta` | /about/api — endpoints, rate limiting, caching |
+| `about-contribute.eta` | /about/contribute — requirements, 7 steps, helpers |
+| `about-sidebar.eta` | Shared sidebar for about pages |
+
+**Note:** The original spec had 8 templates. The implementation added 2 sidebar
+templates (`benchmarks-sidebar.eta`, `about-sidebar.eta`) to avoid duplicating
+sidebar rendering logic across overview/library and about/api/contribute pages.
 
 ### `src/templates/shell.eta`
 
@@ -956,138 +773,65 @@ truth for structure.
 
 ---
 
-## Step 5 — Updated page renderers
+## Step 5 — Updated page renderers ✅
 
-Page renderers become pure logic: detect locale, load messages, collect data
+> All 4 page renderers and the shell rewritten. Router updated.
+
+Page renderers are now pure logic: detect locale, load messages, collect data
 from the registry, call `renderTemplate()`, return a `Response`.
 
-### Example: `src/server/pages/home.ts` after refactor
+**Key design decisions (differs from original spec):**
 
-```typescript
-// src/server/pages/home.ts
-
-import { SITE, IS_PROD } from "../config";
-import { renderTemplate } from "../eta";
-import { makeT, detectLocale, type Locale } from "../i18n";
-import { getLibrariesByEcosystem, getEcosystemLabel, getLibraryCount } from "../registry";
-import { CRITICAL_CSS, NAV_ITEMS } from "../shell";
-
-const pageCache = new Map<Locale, string>();
-
-export function clearHomeCache(): void {
-  pageCache.clear();
-}
-
-export function renderHomepage(req: Request): Response {
-  const locale = detectLocale(req);
-
-  if (IS_PROD && pageCache.has(locale)) {
-    return new Response(pageCache.get(locale)!, htmlHeaders());
-  }
-
-  const t = makeT(locale, "home");
-  const tCommon = makeT(locale, "common");
-
-  // Build data for the template
-  const byEcosystem = getLibrariesByEcosystem();
-  const ecosystemOrder = ["react", "vue", "solid", "svelte", "vanilla", "multi"] as const;
-
-  const ecosystems = ecosystemOrder
-    .map((eco) => ({
-      label: getEcosystemLabel(eco),
-      libs: (byEcosystem.get(eco) ?? []).map((lib) => ({
-        slug: lib.slug,
-        name: lib.name,
-        tagline: lib.tagline,
-        npm: lib.npm,
-      })),
-    }))
-    .filter((g) => g.libs.length > 0);
-
-  const features = [
-    { icon: "🎯", titleKey: "fair_title",        descKey: "fair_desc" },
-    { icon: "🌍", titleKey: "crowdsourced_title", descKey: "crowdsourced_desc" },
-    { icon: "📊", titleKey: "metrics_title",      descKey: "metrics_desc" },
-    { icon: "🔬", titleKey: "stress_title",       descKey: "stress_desc" },
-    { icon: "⚡", titleKey: "speeds_title",       descKey: "speeds_desc" },
-    { icon: "🔓", titleKey: "open_title",         descKey: "open_desc" },
-  ];
-
-  const steps = [
-    { titleKey: "step1_title", descKey: "step1_desc" },
-    { titleKey: "step2_title", descKey: "step2_desc" },
-    { titleKey: "step3_title", descKey: "step3_desc" },
-    { titleKey: "step4_title", descKey: "step4_desc" },
-  ];
-
-  // Render page content via Eta
-  const content = renderTemplate("home", { t, ecosystems, features, steps, count: getLibraryCount() });
-
-  // Wrap in shell
-  const html = renderTemplate("shell", {
-    locale,
-    title: t("meta.title"),
-    description: t("meta.description"),
-    url: `${SITE}/`,
-    content,
-    ogType: "website",
-    activeNav: undefined,
-    navItems: NAV_ITEMS,
-    t: tCommon,
-    criticalCss: CRITICAL_CSS,
-    extraHead: HOME_CSS_TAG,
-    extraBody: "",
-    mainClass: "",
-  });
-
-  if (IS_PROD) pageCache.set(locale, html);
-
-  return new Response(html, htmlHeaders());
-}
-
-function htmlHeaders(): ResponseInit {
-  return {
-    headers: {
-      "Content-Type": "text/html; charset=utf-8",
-      "Cache-Control": IS_PROD
-        ? "public, max-age=3600, must-revalidate"
-        : "no-cache, no-store, must-revalidate",
-    },
-  };
-}
-
-// Page-specific CSS tag (the CSS string itself moves to a .css file or stays here)
-const HOME_CSS_TAG = `<link rel="stylesheet" href="/dist/home.css">`;
-// Note: during the refactor, inline CSS constants can stay as-is initially
-// and be migrated to external files in a follow-up pass.
-```
+- **Single `t` everywhere** — the same `t()` function (from `makeT(locale, namespace)`)
+  is passed to both the page template and the shell. The original spec had a separate
+  `tCommon` for the shell, but since `makeT` already falls through to common, this
+  is unnecessary. Simpler, fewer allocations, and a page can override common keys
+  if needed.
+- **Shell called via `renderShell()` wrapper** — page renderers call `renderShell(options)`
+  instead of raw `renderTemplate("shell", data)`. The wrapper handles defaults and
+  keeps the interface typed via `ShellOptions`. Shell.ts exports `CRITICAL_CSS`,
+  `NAV_ITEMS`, and `renderShell()`.
+- **CSS stays as inline `<style>` tags** — the original spec suggested `<link>` tags
+  to external CSS files. The implementation keeps CSS as TypeScript string constants
+  injected via `extraHead: \`<style>\${PAGE_CSS}</style>\``. This matches the
+  pre-refactor behavior and avoids a build pipeline change. CSS extraction to files
+  is deferred to Step 6.
+- **Page caches keyed by locale** — `Map<Locale, string>` for single-page renderers
+  (home, methodology), `Map<string, string>` with `\`\${locale}/\${slug}\`` keys for
+  multi-page renderers (benchmarks, about).
 
 ### Router change
 
-The router must pass `req` to page renderers so they can detect the locale:
+All resolve functions now receive `req` and pass it to page renderers:
 
 ```typescript
-// Before
-function resolveHomepage(pathname: string): Response | null {
-  if (pathname === "/" || pathname === "") return renderHomepage();
-  return null;
-}
+function resolveHomepage(pathname: string, req: Request): Response | null { … }
+function resolveBenchmarks(pathname: string, req: Request): Response | null { … }
+function resolveMethodology(pathname: string, req: Request): Response | null { … }
+function resolveAbout(pathname: string, req: Request): Response | null { … }
+```
 
-// After
-function resolveHomepage(pathname: string, req: Request): Response | null {
-  if (pathname === "/" || pathname === "") return renderHomepage(req);
-  return null;
-}
+The main `handleRequest()` passes `req` through:
+
+```typescript
+const syncResponse =
+  routeSystem(pathname) ??
+  resolveHomepage(pathname, req) ??
+  resolveBenchmarks(pathname, req) ??
+  resolveMethodology(pathname, req) ??
+  resolveAbout(pathname, req) ??
+  resolveStatic(pathname);
 ```
 
 ---
 
-## Step 6 — CSS files
+## Step 6 — CSS files (deferred)
 
-The current architecture inlines page CSS as TypeScript string constants
-(`HOME_CSS`, `BENCH_CSS`, `METHODOLOGY_CSS`, `ABOUT_CSS`). These do not
-need to move in the same PR as the i18n refactor, but should be migrated
-to proper `.css` files in a follow-up:
+CSS remains as TypeScript string constants (`HOME_CSS`, `BENCH_CSS`,
+`METHODOLOGY_CSS`, `ABOUT_CSS`, `CRITICAL_CSS`) inlined via `<style>` tags.
+This matches the pre-refactor behavior and works fine.
+
+A future PR can migrate these to proper `.css` files:
 
 ```
 styles/
@@ -1098,29 +842,28 @@ styles/
 └── about.css         ← moved from ABOUT_CSS in about.ts
 ```
 
-The build script processes these with the existing CSS minifier and outputs
-them to `dist/`. The shell template links `critical.css` inline (read at
-startup with `readFileSync`) and each page links its own stylesheet via the
-`extraHead` slot.
-
-This can be done as a separate PR after the i18n refactor lands.
+This is low priority — the current approach has zero overhead (strings are
+built once and cached) and doesn't block i18n or any other feature.
 
 ---
 
-## Step 7 — Translation pipeline integration
+## Step 7 — Translation pipeline integration (deferred)
+
+> Plan: create an independent translation tool repo (not tied to Radiooooo).
 
 Once the refactor is complete, `locales/en/` is the only source that needs
-maintaining by hand. Adding a new language follows the same workflow as the
-existing translations project:
+maintaining by hand. Adding a new language:
 
 1. Copy `locales/en/` to `locales/fr/`
-2. Run the Claude translation script pointed at the new JSON files
+2. Run a translation tool pointed at the new JSON files
 3. Add `"fr"` to `SUPPORTED_LOCALES` in `src/server/i18n.ts`
 4. Add language-prefixed sitemap entries (Phase 2 URL routing)
 
-The JSON format (flat keys, `{placeholder}` syntax) is identical to what the
-translation pipeline already handles for other projects. No translation
-infrastructure changes are needed.
+The JSON format (flat/one-level-deep keys, `{placeholder}` syntax, inline HTML
+tags preserved) is straightforward for automated translation. The plan is to
+build an independent, reusable translation CLI tool — not coupled to any
+specific project — that can diff source vs target JSON and translate only
+what changed. This tool will be a separate repo.
 
 ---
 
@@ -1143,66 +886,54 @@ This is a separate workstream and should not block the initial i18n refactor.
 
 ## Implementation order
 
-Do these in sequence. Each step is independently mergeable.
+All steps were implemented together on branch `refactor/i18n-architecture`.
 
-1. **Create `locales/en/` JSON files** — no code changes, just content extraction.
-   Verify every string currently in the `.ts` files has a corresponding key.
-
-2. **Create `src/server/i18n.ts`** — the loader and `makeT()` factory. Write unit
-   tests for key lookup, variable substitution, missing-key fallback, and locale
-   detection.
-
-3. **Create `src/server/eta.ts`** — the Eta singleton. Verify `renderTemplate()`
-   works with a trivial template before touching any page.
-
-4. **Create `src/templates/shell.eta`** — migrate the shell HTML. Update
-   `src/server/shell.ts` to export `CRITICAL_CSS` and `NAV_ITEMS` as data, remove
-   `buildNav()` and `buildFooter()` HTML functions, and call `renderTemplate("shell", …)`.
-   All pages still work because they pass `content` as a string.
-
-5. **Migrate one page at a time** — start with the simplest (home), confirm it
-   works end-to-end (locale detection → template rendering → correct HTML output →
-   200 response), then proceed to benchmarks, methodology, about.
-
-6. **Update the router** to pass `req` to page renderers.
-
-7. **Verify the page cache** still works correctly per locale key.
-
-8. **Update the docs** (`docs/pages.md`, `docs/server.md`, `docs/architecture.md`,
-   `docs/styling.md`) to reflect the new structure.
+1. ✅ **Create `locales/en/` JSON files** — 5 files, 307 keys total.
+2. ✅ **Create `src/server/i18n.ts`** — loader, `makeT()`, `detectLocale()`, preloading.
+3. ✅ **Create `src/server/eta.ts`** — Eta v4.5.1 singleton, `renderTemplate()`, `clearTemplateCache()`.
+4. ✅ **Create `src/templates/*.eta`** — 10 templates (shell, 4 pages, 2 sidebars, 3 about sub-pages).
+5. ✅ **Rewrite all page renderers** — shell.ts, home.ts, benchmarks.ts, methodology.ts, about.ts.
+6. ✅ **Update the router** — pass `req` to all page renderers.
+7. ✅ **Verify page caches** — keyed by locale, all 7 routes return 200 with correct content.
+8. ⬜ **Update the docs** — `docs/pages.md`, `docs/server.md`, `docs/architecture.md`, `docs/styling.md`.
 
 ---
 
 ## Files touched
 
-| Action | File |
-|--------|------|
-| Create | `locales/en/common.json` |
-| Create | `locales/en/home.json` |
-| Create | `locales/en/benchmarks.json` |
-| Create | `locales/en/methodology.json` |
-| Create | `locales/en/about.json` |
-| Create | `src/server/i18n.ts` |
-| Create | `src/server/eta.ts` |
-| Create | `src/templates/shell.eta` |
-| Create | `src/templates/home.eta` |
-| Create | `src/templates/benchmarks-overview.eta` |
-| Create | `src/templates/benchmarks-library.eta` |
-| Create | `src/templates/methodology.eta` |
-| Create | `src/templates/about.eta` |
-| Create | `src/templates/about-api.eta` |
-| Create | `src/templates/about-contribute.eta` |
-| Rewrite | `src/server/shell.ts` (logic only, no HTML strings) |
-| Rewrite | `src/server/pages/home.ts` (logic only) |
-| Rewrite | `src/server/pages/benchmarks.ts` (logic only) |
-| Rewrite | `src/server/pages/methodology.ts` (logic only) |
-| Rewrite | `src/server/pages/about.ts` (logic only) |
-| Update | `src/server/router.ts` (pass `req` to page renderers) |
-| Update | `docs/architecture.md` |
-| Update | `docs/server.md` |
-| Update | `docs/pages.md` |
-| Update | `docs/styling.md` |
+| Action | File | Status |
+|--------|------|--------|
+| Create | `locales/en/common.json` (22 keys) | ✅ |
+| Create | `locales/en/home.json` (31 keys) | ✅ |
+| Create | `locales/en/benchmarks.json` (11 keys) | ✅ |
+| Create | `locales/en/methodology.json` (153 keys) | ✅ |
+| Create | `locales/en/about.json` (90 keys) | ✅ |
+| Create | `src/server/i18n.ts` (226 lines) | ✅ |
+| Create | `src/server/eta.ts` (64 lines) | ✅ |
+| Create | `src/templates/shell.eta` | ✅ |
+| Create | `src/templates/home.eta` | ✅ |
+| Create | `src/templates/benchmarks-overview.eta` | ✅ |
+| Create | `src/templates/benchmarks-library.eta` | ✅ |
+| Create | `src/templates/benchmarks-sidebar.eta` | ✅ (new — not in original spec) |
+| Create | `src/templates/methodology.eta` | ✅ |
+| Create | `src/templates/about.eta` | ✅ |
+| Create | `src/templates/about-api.eta` | ✅ |
+| Create | `src/templates/about-contribute.eta` | ✅ |
+| Create | `src/templates/about-sidebar.eta` | ✅ (new — not in original spec) |
+| Rewrite | `src/server/shell.ts` (−120 lines) | ✅ |
+| Rewrite | `src/server/pages/home.ts` (−185 lines) | ✅ |
+| Rewrite | `src/server/pages/benchmarks.ts` (−198 lines) | ✅ |
+| Rewrite | `src/server/pages/methodology.ts` (−536 lines) | ✅ |
+| Rewrite | `src/server/pages/about.ts` (−594 lines) | ✅ |
+| Update | `src/server/router.ts` | ✅ |
+| Update | `docs/architecture.md` | ⬜ |
+| Update | `docs/server.md` | ⬜ |
+| Update | `docs/pages.md` | ⬜ |
+| Update | `docs/styling.md` | ⬜ |
+
+**Net change:** −1,833 lines removed from `.ts` files, +360 lines added.
+17 new files created.
 
 No changes to: `benchmarks/`, `src/api/`, `src/server/registry.ts`,
 `src/server/config.ts`, `src/server/static.ts`, `src/server/sitemap.ts`,
-`scripts/`, `package.json` (Eta is already a dependency).
+`scripts/`, `package.json` (Eta was already a dependency).

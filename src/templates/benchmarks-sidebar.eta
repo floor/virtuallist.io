@@ -1,0 +1,11 @@
+<aside class="sidebar">
+  <a href="/benchmarks" class="sidebar__link<%= !it.activeSlug ? ' sidebar__link--active' : '' %>"><%= it.t("sidebar.overview_link") %></a>
+  <% it.ecosystems.forEach(function(group) { %>
+  <div class="sidebar__group">
+    <div class="sidebar__group-label"><%= group.label %></div>
+    <% group.libs.forEach(function(lib) { %>
+    <a href="/benchmarks/<%= lib.slug %>" class="sidebar__link<%= lib.slug === it.activeSlug ? ' sidebar__link--active' : '' %>"><%= lib.name %></a>
+    <% }) %>
+  </div>
+  <% }) %>
+</aside>
