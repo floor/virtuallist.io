@@ -78,7 +78,7 @@ defineLibrary({
         style: { height: `${container.clientHeight || 600}px`, width: "100%" },
         overscan: DEFAULT_OVERSCAN,
       },
-      ...getChildren(itemCount),
+      getChildren(itemCount),
     );
 
     const root = ReactDOM.createRoot(container);
