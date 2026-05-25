@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@floor/virtuallist": "^0.1.0",
-    "vlist": "file:../vlist",
+    "vlist": "^1.5.0",
     "@legendapp/list": "3.0.0-beta.40",
     "@tanstack/react-virtual": "^3.13.18",
     "@tanstack/solid-virtual": "^3.13.18",
@@ -37,10 +37,10 @@
     "react-window": "1.8.10",
     "solid-js": "^1.9.11",
     "virtua": "^0.48.6",
-    "vlist-react": "file:../vlist-react",
-    "vlist-solidjs": "file:../vlist-solidjs",
-    "vlist-svelte": "file:../vlist-svelte",
-    "vlist-vue": "file:../vlist-vue",
+    "vlist-react": "^1.6.0",
+    "vlist-solidjs": "^1.6.0",
+    "vlist-svelte": "^1.6.0",
+    "vlist-vue": "^1.6.0",
     "vue": "^3.5.28",
     "vue-virtual-scroller": "^2.0.0-beta.8"
   },
