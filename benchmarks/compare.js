@@ -383,6 +383,7 @@ async function handleRunClick() {
             }
           },
           stressMs: selectedStressMs,
+          setup: adapter.setup,
           createComponent: adapter.create,
           destroyComponent: adapter.destroy,
         });

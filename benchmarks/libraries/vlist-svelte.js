@@ -28,6 +28,7 @@ import {
   DEFAULT_OVERSCAN,
   benchmarkTemplate,
 } from "../runner.js";
+import { setupVlistStyles } from "./_vlist-styles.js";
 
 // =============================================================================
 // Eager dependency load
@@ -70,6 +71,8 @@ defineLibrary({
   slug: "vlist-svelte",
   name: "VList (Svelte)",
   ecosystem: "svelte",
+
+  setup: setupVlistStyles,
 
   /**
    * Mount a vlist-svelte list into the container.

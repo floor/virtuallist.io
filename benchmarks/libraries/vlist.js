@@ -18,6 +18,7 @@ import {
   DEFAULT_OVERSCAN,
   benchmarkTemplate,
 } from "../runner.js";
+import { setupVlistStyles } from "./_vlist-styles.js";
 
 // =============================================================================
 // Eager dependency load
@@ -63,6 +64,8 @@ defineLibrary({
   name: "VList",
   ecosystem: "vanilla",
 
+  setup: setupVlistStyles,
+
   /**
    * Mount a VList instance into the container.
    *
@@ -70,9 +73,7 @@ defineLibrary({
    * @param {number} itemCount - Number of items in the list
    * @returns {Promise<*>} VList instance (for later destruction)
    */
-  create: async (container, itemCount) => {
-    await depsReady;
-
+  create: (container, itemCount) => {
     if (!createVList) {
       throw new Error(
         "VList is not available -- failed to load vlist" +
@@ -80,7 +81,7 @@ defineLibrary({
       );
     }
 
-    const list = createVList({
+    return createVList({
       container,
       overscan: DEFAULT_OVERSCAN,
       items: getItems(itemCount),
@@ -88,9 +89,8 @@ defineLibrary({
         height: ITEM_HEIGHT,
         template: benchmarkTemplate,
       },
+      defer: true,
     });
-
-    return list;
   },
 
   /**

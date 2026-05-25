@@ -27,6 +27,7 @@ import {
   DEFAULT_OVERSCAN,
   benchmarkTemplate,
 } from "../runner.js";
+import { setupVlistStyles } from "./_vlist-styles.js";
 
 // =============================================================================
 // Eager dependency load
@@ -71,6 +72,8 @@ defineLibrary({
   slug: "vlist-solidjs",
   name: "VList (SolidJS)",
   ecosystem: "solid",
+
+  setup: setupVlistStyles,
 
   /**
    * Mount a vlist-solidjs list into the container.

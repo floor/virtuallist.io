@@ -96,6 +96,7 @@ function getHeadlessBundle(): string {
   return readFileSync(resolve(DIST_DIR, "headless.js"), "utf-8");
 }
 
+
 // =============================================================================
 // Queue Management
 // =============================================================================
@@ -327,6 +328,7 @@ async function executeRun(
           itemCount: count,
           stressMs: stress,
           intensity: intensityArg,
+          setup: adapter.setup,
           createComponent: adapter.create,
           destroyComponent: adapter.destroy,
           onStatus: (message: string) => {

@@ -24,6 +24,7 @@ import {
   DEFAULT_OVERSCAN,
   benchmarkTemplate,
 } from "../runner.js";
+import { setupVlistStyles } from "./_vlist-styles.js";
 
 // =============================================================================
 // Eager dependency load
@@ -31,7 +32,7 @@ import {
 
 let React = null,
   ReactDOM = null,
-  useVList = null,
+  createVList = null,
   loadError = null;
 
 const depsReady = (async () => {
@@ -41,8 +42,8 @@ const depsReady = (async () => {
     ReactDOM = ReactDOMClient.createRoot
       ? ReactDOMClient
       : (ReactDOMClient.default ?? ReactDOMClient);
-    const vlistReact = await import("vlist-react");
-    useVList = vlistReact.useVList ?? vlistReact.default;
+    const vlistMod = await import("vlist");
+    createVList = vlistMod.createVList;
   } catch (err) {
     loadError = err;
     console.error("[vlist-react] Failed to load dependencies:", err);
@@ -76,6 +77,8 @@ defineLibrary({
   name: "VList (React)",
   ecosystem: "react",
 
+  setup: setupVlistStyles,
+
   /**
    * Mount a vlist-react list into the container.
    *
@@ -91,62 +94,44 @@ defineLibrary({
    */
   create: async (container, itemCount) => {
     await depsReady;
-    if (!useVList) {
+    if (!createVList) {
       throw new Error(
-        "VList (React) is not available — failed to load vlist-react" +
+        "VList (React) is not available — failed to load vlist" +
           (loadError ? `: ${loadError.message}` : ""),
       );
     }
 
-    const height = container.clientHeight || 600;
-    const _useVList = useVList;
     const _React = React;
+    const _createVList = createVList;
+    const height = container.clientHeight || 600;
 
     return new Promise((resolve) => {
-      let resolved = false;
-
-      function VListBenchmark({ height }) {
-        // Mount with empty items — setItems() is called after mount so that
-        // array allocation is never inside the timed create() region.
-        const { containerRef, instanceRef } = _useVList({
-          items: [],
-          overscan: DEFAULT_OVERSCAN,
-          item: {
-            height: ITEM_HEIGHT,
-            template: benchmarkTemplate,
-          },
-        });
+      function VListBenchmark() {
+        const ref = _React.useRef(null);
 
         _React.useEffect(() => {
-          const instance = instanceRef.current;
-          if (!resolved && instance) {
-            resolved = true;
-            // setItems() triggers the actual virtualisation render —
-            // array was pre-built in getItems() outside the timed region.
-            if (typeof instance.setItems === "function") {
-              instance.setItems(getItems(itemCount));
-            }
-            resolve({ root, instance });
-          }
-        });
+          const el = ref.current;
+          if (!el) return;
+          const list = _createVList({
+            container: el,
+            overscan: DEFAULT_OVERSCAN,
+            items: getItems(itemCount),
+            item: {
+              height: ITEM_HEIGHT,
+              template: benchmarkTemplate,
+            },
+          });
+          resolve({ root, instance: list });
+        }, []);
 
         return _React.createElement("div", {
-          ref: containerRef,
+          ref,
           style: { height: `${height}px`, width: "100%", overflow: "auto" },
         });
       }
 
       const root = ReactDOM.createRoot(container);
-      root.render(_React.createElement(VListBenchmark, { height }));
-
-      // Fallback: if the useEffect never fires within 2s, resolve anyway
-      // so destroy() can still unmount the React root cleanly.
-      setTimeout(() => {
-        if (!resolved) {
-          resolved = true;
-          resolve({ root, instance: null });
-        }
-      }, 2000);
+      root.render(_React.createElement(VListBenchmark));
     });
   },
 

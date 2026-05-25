@@ -90,6 +90,25 @@ import {
 } from "./constants.js";
 
 // =============================================================================
+// Style Injection
+// =============================================================================
+
+const injectedStyles = new Set();
+
+/**
+ * Inject a CSS string into the document, deduped by id.
+ * Adapters that need library CSS call this from their setup() hook.
+ */
+export function injectStyles(id, css) {
+  if (injectedStyles.has(id)) return;
+  const el = document.createElement("style");
+  el.setAttribute("data-bench-styles", id);
+  el.textContent = css;
+  document.head.appendChild(el);
+  injectedStyles.add(id);
+}
+
+// =============================================================================
 // Types (via JSDoc)
 // =============================================================================
 
@@ -131,6 +150,8 @@ import {
  *   — Mount the library's virtual list. Returns an instance handle for later destruction.
  * @property {(instance: *) => Promise<void>} destroy
  *   — Unmount and clean up the library instance.
+ * @property {(container: HTMLElement) => Promise<void>} [setup]
+ *   — Optional one-time setup (e.g. inject CSS). Called once before Phase 0.
  * @property {string} [version] - Library version (auto-detected if possible)
  */
 
@@ -444,9 +465,12 @@ export const benchmarkLibrary = async ({
   onPhaseResult,
   stressMs = 0,
   intensity,
+  setup,
   createComponent,
   destroyComponent,
 }) => {
+  if (setup) await setup(container);
+
   const preset = INTENSITY_PRESETS[intensity] || INTENSITY_PRESETS.default;
   const {
     warmupIterations,
@@ -836,6 +860,7 @@ export const runBenchmarks = async (options) => {
         itemCount,
         onStatus: status,
         stressMs,
+        setup: adapter.setup,
         createComponent: adapter.create,
         destroyComponent: adapter.destroy,
       });

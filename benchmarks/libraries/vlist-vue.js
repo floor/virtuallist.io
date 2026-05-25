@@ -29,6 +29,7 @@ import {
   DEFAULT_OVERSCAN,
   benchmarkTemplate,
 } from "../runner.js";
+import { setupVlistStyles } from "./_vlist-styles.js";
 
 // =============================================================================
 // Eager dependency load
@@ -72,6 +73,8 @@ defineLibrary({
   slug: "vlist-vue",
   name: "VList (Vue)",
   ecosystem: "vue",
+
+  setup: setupVlistStyles,
 
   /**
    * Mount a vlist-vue list into the container.
