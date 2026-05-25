@@ -1,0 +1,39 @@
+<div class="bench-overview">
+  <header class="bench-overview__header">
+    <h1 class="bench-overview__title"><%= it.t("overview.title") %></h1>
+    <p class="bench-overview__desc"><%~ it.t("overview.desc", { count: it.count }) %></p>
+    <div class="bench-overview__meta">
+      <span class="bench-tag"><%~ it.t("bench_tag.libraries", { count: it.count }) %></span>
+      <span class="bench-tag"><%= it.t("bench_tag.metrics") %></span>
+      <span class="bench-tag"><%= it.t("bench_tag.scroll_speeds") %></span>
+      <span class="bench-tag"><%= it.t("bench_tag.crowdsourced") %></span>
+    </div>
+  </header>
+
+  <% it.ecosystems.forEach(function(group) { %>
+  <div class="bench-overview__section">
+    <h3 class="bench-overview__ecosystem-label"><%= group.label %></h3>
+    <div class="bench-overview__grid">
+      <% group.libs.forEach(function(lib) { %>
+      <a href="/benchmarks/<%= lib.slug %>" class="bench-overview-card">
+        <div class="bench-overview-card__header">
+          <span class="bench-overview-card__name"><%= lib.name %></span>
+          <span class="bench-overview-card__ecosystem"><%= group.label %></span>
+        </div>
+        <p class="bench-overview-card__desc"><%= lib.tagline %></p>
+        <div class="bench-overview-card__footer">
+          <code class="bench-overview-card__npm"><%= lib.npm %></code>
+          <span class="bench-overview-card__arrow">→</span>
+        </div>
+      </a>
+      <% }) %>
+    </div>
+  </div>
+  <% }) %>
+
+  <div class="bench-overview__methodology">
+    <h3 class="bench-overview__methodology-title"><%= it.t("overview.methodology_title") %></h3>
+    <p class="bench-overview__methodology-desc"><%= it.t("overview.methodology_desc") %></p>
+    <a href="/methodology" class="bench-overview__methodology-link"><%~ it.t("overview.methodology_link") %></a>
+  </div>
+</div>

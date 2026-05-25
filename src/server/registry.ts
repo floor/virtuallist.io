@@ -16,7 +16,13 @@
 // Types
 // =============================================================================
 
-export type Ecosystem = "react" | "vue" | "solid" | "svelte" | "vanilla" | "multi";
+export type Ecosystem =
+  | "react"
+  | "vue"
+  | "solid"
+  | "svelte"
+  | "vanilla"
+  | "multi";
 
 export interface LibraryInfo {
   /** URL-safe slug — used in routes, filenames, and DB records. */
@@ -69,16 +75,54 @@ export interface LibraryInfo {
 const LIBRARIES: LibraryInfo[] = [
   // ── React Ecosystem ─────────────────────────────────────────────────────
   {
-    slug: "vlist-react",
-    name: "VList (React)",
-    tagline: "Lightweight virtual list with zero-dependency core, React binding",
+    slug: "legend-list",
+    name: "Legend List",
+    tagline:
+      "High-performance list with item recycling and bidirectional infinite scroll",
     ecosystem: "react",
-    npm: "vlist-react",
-    github: "https://github.com/floor/vlist",
-    npmUrl: "https://www.npmjs.com/package/vlist-react",
-    homepage: "https://vlist.dev",
+    npm: "@legendapp/list",
+    github: "https://github.com/LegendApp/legend-list",
+    npmUrl: "https://www.npmjs.com/package/@legendapp/list",
     enabled: true,
     order: 10,
+  },
+  {
+    slug: "react-virtuoso",
+    name: "react-virtuoso",
+    tagline:
+      "Feature-rich React virtualization with auto-height, groups, and table support",
+    ecosystem: "react",
+    npm: "react-virtuoso",
+    github: "https://github.com/petyosi/react-virtuoso",
+    npmUrl: "https://www.npmjs.com/package/react-virtuoso",
+    homepage: "https://virtuoso.dev",
+    enabled: true,
+    order: 20,
+  },
+  {
+    slug: "react-window",
+    name: "react-window",
+    tagline:
+      "Minimalist windowed list components (FixedSizeList, VariableSizeList)",
+    ecosystem: "react",
+    npm: "react-window",
+    github: "https://github.com/bvaughn/react-window",
+    npmUrl: "https://www.npmjs.com/package/react-window",
+    homepage: "https://react-window.vercel.app",
+    enabled: true,
+    order: 30,
+  },
+  {
+    slug: "react-virtualized",
+    name: "react-virtualized",
+    tagline: "Feature-rich windowed list, grid, and table components for React",
+    ecosystem: "react",
+    npm: "react-virtualized",
+    github: "https://github.com/bvaughn/react-virtualized",
+    npmUrl: "https://www.npmjs.com/package/react-virtualized",
+    homepage: "https://bvaughn.github.io/react-virtualized",
+    enabled: true,
+    order: 35,
   },
   {
     slug: "tanstack-virtual",
@@ -90,31 +134,19 @@ const LIBRARIES: LibraryInfo[] = [
     npmUrl: "https://www.npmjs.com/package/@tanstack/react-virtual",
     homepage: "https://tanstack.com/virtual",
     enabled: true,
-    order: 20,
-  },
-  {
-    slug: "react-window",
-    name: "react-window",
-    tagline: "Minimalist windowed list components (FixedSizeList, VariableSizeList)",
-    ecosystem: "react",
-    npm: "react-window",
-    github: "https://github.com/bvaughn/react-window",
-    npmUrl: "https://www.npmjs.com/package/react-window",
-    homepage: "https://react-window.vercel.app",
-    enabled: true,
-    order: 30,
-  },
-  {
-    slug: "react-virtuoso",
-    name: "react-virtuoso",
-    tagline: "Feature-rich React virtualization with auto-height, groups, and table support",
-    ecosystem: "react",
-    npm: "react-virtuoso",
-    github: "https://github.com/petyosi/react-virtuoso",
-    npmUrl: "https://www.npmjs.com/package/react-virtuoso",
-    homepage: "https://virtuoso.dev",
-    enabled: true,
     order: 40,
+  },
+  {
+    slug: "vlist-react",
+    name: "VList (React)",
+    tagline: "React useVList hook wrapping the zero-dependency vlist engine",
+    ecosystem: "react",
+    npm: "vlist-react",
+    github: "https://github.com/floor/vlist-react",
+    npmUrl: "https://www.npmjs.com/package/vlist-react",
+    homepage: "https://vlist.io",
+    enabled: true,
+    order: 50,
   },
   {
     slug: "virtua",
@@ -125,32 +157,34 @@ const LIBRARIES: LibraryInfo[] = [
     github: "https://github.com/inokawa/virtua",
     npmUrl: "https://www.npmjs.com/package/virtua",
     enabled: true,
-    order: 50,
-  },
-  {
-    slug: "legend-list",
-    name: "Legend List",
-    tagline: "High-performance list with item recycling and bidirectional infinite scroll",
-    ecosystem: "react",
-    npm: "@legendapp/list",
-    github: "https://github.com/LegendApp/legend-list",
-    npmUrl: "https://www.npmjs.com/package/@legendapp/list",
-    enabled: true,
     order: 60,
   },
 
   // ── Vue Ecosystem ───────────────────────────────────────────────────────
   {
+    slug: "tanstack-vue-virtual",
+    name: "TanStack Virtual (Vue)",
+    tagline: "Headless useVirtualizer composable with Vue 3 reactivity",
+    ecosystem: "vue",
+    npm: "@tanstack/vue-virtual",
+    github: "https://github.com/TanStack/virtual",
+    npmUrl: "https://www.npmjs.com/package/@tanstack/vue-virtual",
+    homepage: "https://tanstack.com/virtual",
+    enabled: true,
+    order: 95,
+  },
+  {
     slug: "vlist-vue",
     name: "VList (Vue)",
-    tagline: "Lightweight virtual list with zero-dependency core, Vue binding",
+    tagline:
+      "Vue 3 useVList composable wrapping the zero-dependency vlist engine",
     ecosystem: "vue",
     npm: "vlist-vue",
-    github: "https://github.com/floor/vlist",
+    github: "https://github.com/floor/vlist-vue",
     npmUrl: "https://www.npmjs.com/package/vlist-vue",
-    homepage: "https://vlist.dev",
+    homepage: "https://vlist.io",
     enabled: true,
-    order: 100,
+    order: 96,
   },
   {
     slug: "vue-virtual-scroller",
@@ -161,22 +195,10 @@ const LIBRARIES: LibraryInfo[] = [
     github: "https://github.com/Akryum/vue-virtual-scroller",
     npmUrl: "https://www.npmjs.com/package/vue-virtual-scroller",
     enabled: true,
-    order: 110,
+    order: 100,
   },
 
   // ── SolidJS Ecosystem ──────────────────────────────────────────────────
-  {
-    slug: "vlist-solidjs",
-    name: "VList (SolidJS)",
-    tagline: "Lightweight virtual list with zero-dependency core, SolidJS binding",
-    ecosystem: "solid",
-    npm: "vlist-solidjs",
-    github: "https://github.com/floor/vlist",
-    npmUrl: "https://www.npmjs.com/package/vlist-solidjs",
-    homepage: "https://vlist.dev",
-    enabled: true,
-    order: 200,
-  },
   {
     slug: "tanstack-solid-virtual",
     name: "TanStack Virtual (SolidJS)",
@@ -187,36 +209,38 @@ const LIBRARIES: LibraryInfo[] = [
     npmUrl: "https://www.npmjs.com/package/@tanstack/solid-virtual",
     homepage: "https://tanstack.com/virtual",
     enabled: true,
-    order: 210,
+    order: 200,
+  },
+  {
+    slug: "vlist-solidjs",
+    name: "VList (SolidJS)",
+    tagline:
+      "SolidJS createVList primitive wrapping the zero-dependency vlist engine",
+    ecosystem: "solid",
+    npm: "vlist-solidjs",
+    github: "https://github.com/floor/vlist-solidjs",
+    npmUrl: "https://www.npmjs.com/package/vlist-solidjs",
+    homepage: "https://vlist.io",
+    enabled: true,
+    order: 201,
   },
 
-  // ── Svelte Ecosystem ──────────────────────────────────────────────────
+  // ── Svelte Ecosystem ───────────────────────────────────────────────────
   {
     slug: "vlist-svelte",
     name: "VList (Svelte)",
-    tagline: "Lightweight virtual list with zero-dependency core, Svelte binding",
+    tagline:
+      "Svelte use:vlist action wrapping the zero-dependency vlist engine",
     ecosystem: "svelte",
     npm: "vlist-svelte",
-    github: "https://github.com/floor/vlist",
+    github: "https://github.com/floor/vlist-svelte",
     npmUrl: "https://www.npmjs.com/package/vlist-svelte",
-    homepage: "https://vlist.dev",
+    homepage: "https://vlist.io",
     enabled: true,
-    order: 300,
+    order: 250,
   },
 
   // ── Vanilla / Framework-agnostic ──────────────────────────────────────
-  {
-    slug: "vlist",
-    name: "VList (Vanilla)",
-    tagline: "Zero-dependency virtual list — pure JavaScript, no framework required",
-    ecosystem: "vanilla",
-    npm: "@floor/vlist",
-    github: "https://github.com/floor/vlist",
-    npmUrl: "https://www.npmjs.com/package/@floor/vlist",
-    homepage: "https://vlist.dev",
-    enabled: true,
-    order: 400,
-  },
   {
     slug: "clusterize",
     name: "Clusterize.js",
@@ -227,7 +251,20 @@ const LIBRARIES: LibraryInfo[] = [
     npmUrl: "https://www.npmjs.com/package/clusterize.js",
     homepage: "https://clusterize.js.org",
     enabled: true,
-    order: 410,
+    order: 300,
+  },
+  {
+    slug: "vlist",
+    name: "VList",
+    tagline:
+      "Zero-dependency virtual list — pure JavaScript, no framework required",
+    ecosystem: "vanilla",
+    npm: "vlist",
+    github: "https://github.com/floor/vlist",
+    npmUrl: "https://www.npmjs.com/package/vlist",
+    homepage: "https://vlist.io",
+    enabled: true,
+    order: 310,
   },
 ];
 
@@ -239,9 +276,9 @@ const LIBRARIES: LibraryInfo[] = [
 const allLibraries: ReadonlyArray<LibraryInfo> = LIBRARIES;
 
 /** Enabled libraries, sorted by order. */
-const enabledLibraries: ReadonlyArray<LibraryInfo> = LIBRARIES
-  .filter((lib) => lib.enabled)
-  .sort((a, b) => a.order - b.order);
+const enabledLibraries: ReadonlyArray<LibraryInfo> = LIBRARIES.filter(
+  (lib) => lib.enabled,
+).sort((a, b) => a.order - b.order);
 
 /** Slug → LibraryInfo lookup. */
 const bySlug = new Map<string, LibraryInfo>(

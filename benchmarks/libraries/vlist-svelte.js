@@ -1,52 +1,65 @@
 // benchmarks/libraries/vlist-svelte.js — VList (Svelte) benchmark adapter
 //
-// Registers vlist-svelte with the benchmark runner so it can be tested
-// with the same measurement pipeline as every other library.
+// Registers vlist-svelte with the benchmark runner so it can be tested with
+// the same measurement pipeline as every other library.
 //
-// vlist-svelte is the Svelte binding for the zero-dependency @floor/vlist core.
+// vlist-svelte exports a `vlist` Svelte action — a use:vlist directive that
+// wires up a vlist instance to a DOM element imperatively. Because
+// it's a plain action (not a component), we can use it directly without
+// spinning up a Svelte component tree or needing a Svelte compiler.
 //
-// ⚠️  NOTE: Svelte components require a compile step. This adapter uses
-// the pre-compiled output from the vlist-svelte package. If the package
-// exposes a compiled JS entry point, it will work directly. Otherwise,
-// a custom Svelte compilation step may be needed in the build process.
+// Implementation notes:
+//   - Dependencies are loaded eagerly at module init time (not inside create())
+//     to avoid measuring import() overhead during the timed render phase.
+//   - The items array is pre-built once per itemCount and cached outside
+//     create() so that array allocation is never counted as render time.
+//   - We call the vlist action directly on a plain div element — this is
+//     exactly what Svelte's use:vlist directive would do under the hood.
+//   - We pass empty items to the action initially, then call setItems() after
+//     mount — matching the vanilla vlist.js pattern so that array-passing
+//     overhead is never inside the timed create() region.
+//   - The action returns an object with a destroy() method (Svelte action
+//     lifecycle) plus any instance methods spread from the vlist instance.
+//   - onInstance callback captures the vlist instance for benchmark destroy().
 
 import {
   defineLibrary,
   ITEM_HEIGHT,
   DEFAULT_OVERSCAN,
-  ITEM_NAMES,
-  ITEM_BADGES,
+  benchmarkTemplate,
 } from "../runner.js";
 
 // =============================================================================
-// Lazy-loaded dependencies
+// Eager dependency load
 // =============================================================================
 
-let VList;
+let vlistAction = null,
+  loadError = null;
 
-/**
- * Lazy load vlist-svelte.
- *
- * vlist-svelte should export a compiled Svelte component (or a factory
- * function) that can be instantiated without a Svelte runtime compile step.
- *
- * Returns false if loading fails.
- */
-const loadDependencies = async () => {
+const depsReady = (async () => {
   try {
-    if (!VList) {
-      const vlistSvelte = await import("vlist-svelte");
-      VList = vlistSvelte.VList || vlistSvelte.default;
-
-      if (!VList) {
-        throw new Error("VList export not found in vlist-svelte");
-      }
-    }
-    return true;
+    const vlistSvelte = await import("vlist-svelte");
+    // vlist-svelte exports: { vlist, onVListEvent }
+    vlistAction = vlistSvelte.vlist ?? vlistSvelte.default;
   } catch (err) {
+    loadError = err;
     console.error("[vlist-svelte] Failed to load dependencies:", err);
-    return false;
   }
+})();
+
+// =============================================================================
+// Items cache
+// =============================================================================
+
+const itemsCache = new Map();
+const getItems = (itemCount) => {
+  if (!itemsCache.has(itemCount)) {
+    itemsCache.set(
+      itemCount,
+      Array.from({ length: itemCount }, (_, i) => ({ id: i })),
+    );
+  }
+  return itemsCache.get(itemCount);
 };
 
 // =============================================================================
@@ -59,122 +72,86 @@ defineLibrary({
   ecosystem: "svelte",
 
   /**
-   * Mount a vlist-svelte VList into the container.
+   * Mount a vlist-svelte list into the container.
    *
-   * Svelte components are typically compiled to a class or function that
-   * accepts a { target, props } options object. This adapter uses the
-   * compiled output from the vlist-svelte package.
-   *
-   * Uses the shared benchmarkTemplate function to render items, ensuring
-   * the same DOM structure as all other library benchmarks.
+   * Calls the vlist Svelte action directly on a plain div element. The action
+   * builds and mounts the vlist instance, calling onInstance once it
+   * is ready. We capture the vlist instance via the onInstance callback and
+   * hold the action handle for cleanup.
    *
    * @param {HTMLElement} container - DOM element to render into
    * @param {number} itemCount - Number of items in the list
-   * @returns {Promise<*>} Svelte component instance (for later $destroy())
+   * @returns {Promise<{actionHandle: *, el: HTMLElement, instance: *}>} Handle for later destruction
    */
   create: async (container, itemCount) => {
-    const loaded = await loadDependencies();
-    if (!loaded) {
+    await depsReady;
+    if (!vlistAction) {
       throw new Error(
-        "VList (Svelte) is not available — failed to load vlist-svelte",
+        "VList (Svelte) is not available — failed to load vlist-svelte" +
+          (loadError ? `: ${loadError.message}` : ""),
       );
     }
 
-    // Build items array with pre-computed display data
-    // (Svelte templates can't call imported JS functions directly
-    // without wrapping, so we pre-compute the display values)
-    const items = [];
-    for (let i = 0; i < itemCount; i++) {
-      const n = ITEM_NAMES[i % ITEM_NAMES.length];
-      const n2 = ITEM_NAMES[(i + 3) % ITEM_NAMES.length];
-      items.push({
-        id: i,
-        index: i,
-        initials: `${n[0]}${n2[0]}`,
-        title: `${n} — Item ${i}`,
-        sub: "Lorem ipsum dolor sit amet",
-        badge: ITEM_BADGES[i % ITEM_BADGES.length],
-        time: `${(i % 59) + 1}m`,
-      });
-    }
+    const height = container.clientHeight || 600;
+    const items = getItems(itemCount);
 
-    // Svelte 4 component API: new Component({ target, props })
-    // Svelte 5 runes API: mount(Component, { target, props })
-    let instance;
+    // Create the scroll container element — this is what the action mounts onto.
+    const el = document.createElement("div");
+    el.style.cssText = `height:${height}px;width:100%;overflow:auto;`;
+    container.appendChild(el);
 
-    if (typeof VList === "function" && VList.prototype && VList.prototype.$destroy) {
-      // Svelte 4 class-based component
-      instance = new VList({
-        target: container,
-        props: {
-          items,
-          overscan: DEFAULT_OVERSCAN,
-          item: {
-            height: ITEM_HEIGHT,
-          },
-          style: `height:${container.clientHeight || 600}px;width:100%;`,
+    let capturedInstance = null;
+
+    // Call the Svelte action directly — equivalent to use:vlist={...} in a
+    // Svelte template. The action builds the vlist instance synchronously and
+    // fires onInstance before returning.
+    // We pass empty items initially so that array allocation is never inside
+    // the timed create() region — setItems() is called below.
+    const actionHandle = vlistAction(el, {
+      config: {
+        items: [],
+        overscan: DEFAULT_OVERSCAN,
+        item: {
+          height: ITEM_HEIGHT,
+          template: benchmarkTemplate,
         },
-      });
-    } else if (typeof VList === "function") {
-      // Svelte 5 runes — try mount() if available on the module
-      const { mount } = await import("svelte").catch(() => ({ mount: null }));
-      if (mount) {
-        instance = mount(VList, {
-          target: container,
-          props: {
-            items,
-            overscan: DEFAULT_OVERSCAN,
-            item: { height: ITEM_HEIGHT },
-            style: `height:${container.clientHeight || 600}px;width:100%;`,
-          },
-        });
-      } else {
-        // Fallback: call as factory function
-        instance = VList({
-          target: container,
-          props: { items, overscan: DEFAULT_OVERSCAN, item: { height: ITEM_HEIGHT } },
-        });
-      }
-    } else {
-      throw new Error(
-        "vlist-svelte: unexpected export format — could not instantiate VList",
-      );
+      },
+      onInstance: (instance) => {
+        capturedInstance = instance;
+      },
+    });
+
+    // setItems() triggers the actual virtualisation render — identical to how
+    // the vanilla vlist.js adapter measures this, so the items array
+    // allocation (pre-built in getItems()) is never inside the timed region.
+    if (capturedInstance && typeof capturedInstance.setItems === "function") {
+      capturedInstance.setItems(items);
     }
 
-    return instance;
+    return { actionHandle, el, instance: capturedInstance };
   },
 
   /**
-   * Destroy a vlist-svelte instance and clean up its DOM.
+   * Destroy the vlist action and clean up the DOM element.
    *
-   * Calls $destroy() for Svelte 4 class components, or unmount() for
-   * Svelte 5 runes-based components.
+   * The action's destroy() method calls instance.destroy() internally.
+   * We also call it defensively in case the action handle is absent.
    *
-   * @param {*} instance - Component instance returned by create()
+   * @param {{actionHandle: *, el: HTMLElement, instance: *}} handle
    */
-  destroy: async (instance) => {
-    if (!instance) return;
-
-    // Svelte 4: $destroy() method on class instances
-    if (typeof instance.$destroy === "function") {
-      instance.$destroy();
-      return;
+  destroy: async (handle) => {
+    if (!handle) return;
+    const { actionHandle, el, instance } = handle;
+    // Call the Svelte action's destroy() lifecycle method first — this
+    // internally calls instance.destroy() via the vlist-svelte action.
+    if (actionHandle && typeof actionHandle.destroy === "function") {
+      actionHandle.destroy();
+    } else if (instance && typeof instance.destroy === "function") {
+      // Fallback: destroy the vlist instance directly if no action handle.
+      instance.destroy();
     }
-
-    // Svelte 5: unmount() from the svelte module
-    try {
-      const { unmount } = await import("svelte").catch(() => ({ unmount: null }));
-      if (unmount && typeof unmount === "function") {
-        unmount(instance);
-        return;
-      }
-    } catch {
-      /* ignore */
-    }
-
-    // Fallback: if instance is a dispose function (some Svelte 5 patterns)
-    if (typeof instance === "function") {
-      instance();
+    if (el && el.parentNode) {
+      el.parentNode.removeChild(el);
     }
   },
 });

@@ -8,9 +8,86 @@
 //
 // Architecture:
 //   - Suite Registry: libraries register their benchmark adapters
-//   - Measurement Utilities: timing, memory, scroll, GC helpers
+//   - Measurement Primitives: imported from @floor/virtuallist
 //   - Runner: orchestrates execution with fairness guarantees
 //   - Rating: threshold-based quality ratings for metrics
+
+// =============================================================================
+// Measurement Primitives (from @floor/virtuallist)
+// =============================================================================
+
+import {
+  nextFrame,
+  waitFrames,
+  wait,
+  measureDuration,
+  measureScrollPerformance,
+  measureScrollToIndex,
+  measureMemoryDelta,
+  getHeapUsed,
+  settleHeap,
+  tryGC,
+  burnCpu,
+  findViewport,
+  median,
+  percentile,
+  round,
+  bytesToMB,
+} from "@floor/virtuallist";
+
+export {
+  nextFrame,
+  waitFrames,
+  wait,
+  measureDuration,
+  measureScrollPerformance,
+  measureScrollToIndex,
+  measureMemoryDelta,
+  getHeapUsed,
+  settleHeap,
+  tryGC,
+  burnCpu,
+  findViewport,
+  median,
+  percentile,
+  round,
+  bytesToMB,
+};
+
+// =============================================================================
+// Constants (from constants.js)
+// =============================================================================
+
+export {
+  ITEM_HEIGHT,
+  WARMUP_ITERATIONS,
+  MEASURE_ITERATIONS,
+  MEMORY_ATTEMPTS,
+  SCROLL_DURATION_MS,
+  BASE_SCROLL_SPEED,
+  DEFAULT_OVERSCAN,
+  SCROLL_SPEEDS,
+  STRESS_LEVELS,
+  JUMP_ITERATIONS,
+  JUMP_TARGETS,
+  ITEM_NAMES,
+  ITEM_BADGES,
+} from "./constants.js";
+
+import {
+  ITEM_HEIGHT,
+  WARMUP_ITERATIONS,
+  MEASURE_ITERATIONS,
+  MEMORY_ATTEMPTS,
+  SCROLL_DURATION_MS,
+  BASE_SCROLL_SPEED,
+  DEFAULT_OVERSCAN,
+  SCROLL_SPEEDS,
+  JUMP_ITERATIONS,
+  JUMP_TARGETS,
+  ITEM_NAMES,
+  ITEM_BADGES,
+} from "./constants.js";
 
 // =============================================================================
 // Types (via JSDoc)
@@ -94,103 +171,8 @@ export const getLibraries = () => [...libraries.values()];
 export const getLibrary = (slug) => libraries.get(slug);
 
 // =============================================================================
-// Constants
-// =============================================================================
-
-/** Fixed row height for all benchmarks (px). */
-export const ITEM_HEIGHT = 48;
-
-/** Number of render iterations for median calculation. */
-export const MEASURE_ITERATIONS = 5;
-
-/** Maximum memory measurement attempts. */
-export const MEMORY_ATTEMPTS = 10;
-
-/** Scroll test duration per speed level (ms). */
-export const SCROLL_DURATION_MS = 2000;
-
-/**
- * Base scroll speed in pixels per second.
- * 1× = 7200 px/s ≈ 2.5 items/frame at 60fps (48px items).
- */
-export const BASE_SCROLL_SPEED = 7200;
-
-/**
- * Default overscan for all libraries (items rendered off-screen).
- * Used where the library supports configurable overscan.
- */
-export const DEFAULT_OVERSCAN = 5;
-
-// =============================================================================
-// Scroll Speed Presets
-// =============================================================================
-
-/**
- * Build a scroll speed preset from a multiplier of BASE_SCROLL_SPEED.
- * @param {string} id - Identifier
- * @param {number} multiplier - Speed multiplier
- * @returns {{id: string, label: string, pxPerSec: number}}
- */
-const scrollSpeed = (id, multiplier) => {
-  const pxPerSec = BASE_SCROLL_SPEED * multiplier;
-  return {
-    id,
-    label: `${pxPerSec.toLocaleString()} px/s`,
-    pxPerSec,
-  };
-};
-
-/**
- * 7 progressive scroll speeds for comprehensive performance profiling.
- *
- *   - 0.1× (720 px/s):   Crawl — pure baseline overhead
- *   - 0.25× (1800 px/s):  Gentle browsing — minimal recycling
- *   - 0.5× (3600 px/s):   Casual scrolling
- *   - 1× (7200 px/s):     Normal scroll speed
- *   - 2× (14400 px/s):    Fast flick — aggressive touch/wheel
- *   - 3× (21600 px/s):    Aggressive scroll
- *   - 5× (36000 px/s):    Stress test — heavy DOM churn
- */
-export const SCROLL_SPEEDS = [
-  scrollSpeed("crawl", 0.1),
-  scrollSpeed("gentle", 0.25),
-  scrollSpeed("slow", 0.5),
-  scrollSpeed("normal", 1),
-  scrollSpeed("fast", 2),
-  scrollSpeed("aggressive", 3),
-  scrollSpeed("extreme", 5),
-];
-
-// =============================================================================
-// CPU Stress Levels
-// =============================================================================
-
-/**
- * Available stress levels for benchmarks.
- * Each level burns a fixed amount of CPU time per frame during scroll
- * measurement, simulating an application with other work alongside
- * the virtual list.
- */
-export const STRESS_LEVELS = [
-  { id: "none", label: "0", ms: 0 },
-  { id: "light", label: "3", ms: 3 },
-  { id: "medium", label: "5", ms: 5 },
-  { id: "heavy", label: "7", ms: 7 },
-];
-
-// =============================================================================
 // Realistic Item Template
 // =============================================================================
-
-/**
- * Shared item data arrays — every library renders the exact same text content.
- */
-export const ITEM_NAMES = [
-  "Alice", "Bob", "Carol", "Dave", "Eve",
-  "Frank", "Grace", "Hank", "Iris", "Jack",
-];
-
-export const ITEM_BADGES = ["Active", "New", "VIP", "Pro"];
 
 /**
  * Realistic item template for benchmarks.
@@ -337,378 +319,8 @@ export const generateRealisticItemHTML = (index, height = ITEM_HEIGHT) => {
   );
 };
 
-// =============================================================================
-// Timing Utilities
-// =============================================================================
 
-/**
- * Wait for the next animation frame.
- * @returns {Promise<number>} timestamp
- */
-export const nextFrame = () =>
-  new Promise((resolve) => requestAnimationFrame(resolve));
 
-/**
- * Wait for N animation frames.
- * @param {number} n
- */
-export const waitFrames = async (n) => {
-  for (let i = 0; i < n; i++) {
-    await nextFrame();
-  }
-};
-
-/**
- * Wait for a specified duration in ms.
- * @param {number} ms
- * @returns {Promise<void>}
- */
-export const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-/**
- * Try to trigger garbage collection and let the engine settle.
- * Falls back to a short pause if gc() is unavailable.
- */
-export const tryGC = async () => {
-  if (typeof globalThis.gc === "function") {
-    globalThis.gc();
-  }
-  await wait(100);
-  await waitFrames(3);
-};
-
-// =============================================================================
-// Performance Timeline — mark/measure timing
-// =============================================================================
-
-/** @type {number} Unique counter for non-colliding mark names */
-let _measureId = 0;
-
-/**
- * Measure the duration of an async function using the Performance Timeline API.
- *
- * Uses `performance.mark` + `performance.measure` for structured timing
- * data that integrates with the browser DevTools Performance panel.
- *
- * Falls back to `performance.now()` if the mark/measure API throws.
- *
- * @template T
- * @param {string} label - Human-readable label (used in DevTools)
- * @param {() => Promise<T>} fn - Async function to time
- * @returns {Promise<{duration: number, result: T}>}
- */
-export const measureDuration = async (label, fn) => {
-  const id = _measureId++;
-  const startMark = `bench-start-${id}`;
-  const endMark = `bench-end-${id}`;
-  const measureName = `bench-${label}-${id}`;
-
-  try {
-    performance.mark(startMark);
-    const result = await fn();
-    performance.mark(endMark);
-
-    const entry = performance.measure(measureName, startMark, endMark);
-    const duration = entry.duration;
-
-    // Clean up to avoid leaking entries
-    performance.clearMarks(startMark);
-    performance.clearMarks(endMark);
-    performance.clearMeasures(measureName);
-
-    return { duration, result };
-  } catch (err) {
-    // Clean up on error, then re-throw
-    try {
-      performance.clearMarks(startMark);
-      performance.clearMarks(endMark);
-      performance.clearMeasures(measureName);
-    } catch (_) {
-      /* ignore cleanup errors */
-    }
-    throw err;
-  }
-};
-
-// =============================================================================
-// Memory Measurement
-// =============================================================================
-
-/**
- * Get current JS heap usage in bytes (Chrome only).
- * Returns null if the API is unavailable.
- * @returns {number|null}
- */
-export const getHeapUsed = () => {
-  const mem = /** @type {any} */ (performance).memory;
-  if (mem && typeof mem.usedJSHeapSize === "number") {
-    return mem.usedJSHeapSize;
-  }
-  return null;
-};
-
-/**
- * Aggressive heap settling — multiple GC + wait cycles.
- *
- * More thorough than `tryGC()`. Designed for memory measurements where
- * residual garbage from previous operations must be reclaimed before
- * taking a heap snapshot.
- *
- * @param {number} [cycles=3] - Number of GC + settle cycles
- */
-export const settleHeap = async (cycles = 3) => {
-  for (let i = 0; i < cycles; i++) {
-    if (typeof globalThis.gc === "function") {
-      globalThis.gc();
-    }
-    await wait(150);
-    await waitFrames(5);
-  }
-};
-
-/**
- * Take a validated heap delta measurement.
- *
- * Measures the memory cost of a create/settle cycle by snapshotting the heap
- * before and after. Rejects negative deltas (GC artifacts) and returns `null`
- * when the measurement is unreliable or the API is unavailable.
- *
- * @param {() => Promise<void>} create - Mount the component (must leave it alive)
- * @param {number} [settleFrames=5] - Frames to wait after creation before measuring
- * @returns {Promise<number|null>} Memory delta in bytes, or null if unreliable
- */
-export const measureMemoryDelta = async (create, settleFrames = 5) => {
-  // Aggressive settle to flush garbage from prior phases
-  await settleHeap();
-
-  const before = getHeapUsed();
-  if (before === null) return null;
-
-  // Create the component under test
-  await create();
-  await waitFrames(settleFrames);
-
-  // Gentle GC to reclaim transient allocations (createElement temporaries, etc.)
-  // but not so aggressive that we reclaim the component itself
-  await tryGC();
-
-  const after = getHeapUsed();
-  if (after === null) return null;
-
-  const delta = after - before;
-
-  // Negative delta means GC reclaimed more old garbage than the component
-  // allocated — this is a measurement artifact, not real data
-  if (delta < 0) return null;
-
-  return delta;
-};
-
-// =============================================================================
-// CPU Stress — simulated app workload
-// =============================================================================
-
-/**
- * Burn CPU for approximately `targetMs` milliseconds.
- *
- * Uses a tight busy-wait loop with `performance.now()` as the exit
- * condition. The loop body cannot be dead-code-eliminated because
- * `performance.now()` reads the system clock (observable side-effect).
- *
- * @param {number} targetMs - Milliseconds of CPU time to consume
- */
-export const burnCpu = (targetMs) => {
-  if (targetMs <= 0) return;
-  const end = performance.now() + targetMs;
-  while (performance.now() < end) {
-    /* busy wait */
-  }
-};
-
-// =============================================================================
-// Viewport Detection
-// =============================================================================
-
-/**
- * Find the scrollable viewport element within a container.
- *
- * Libraries create different DOM structures. This function locates the
- * actual scrollable element using multiple strategies:
- *   1. Look for `.vlist-viewport` (vlist-specific)
- *   2. Depth-first search for any child with `overflow: auto|scroll`
- *   3. Find the deepest element whose scrollHeight > clientHeight
- *   4. Fall back to the first child element
- *
- * @param {HTMLElement} container - Benchmark container
- * @returns {HTMLElement|null}
- */
-export const findViewport = (container) => {
-  if (!container) return null;
-
-  // Strategy 1: Known class names used by popular libraries
-  const knownSelectors = [
-    ".vlist-viewport",       // vlist
-    "[data-testid='virtuoso-scroller']", // react-virtuoso
-  ];
-
-  for (const selector of knownSelectors) {
-    const el = container.querySelector(selector);
-    if (el) return el;
-  }
-
-  // Strategy 2: CSS overflow detection
-  const isScrollable = (style) => {
-    const vals = ["auto", "scroll"];
-    if (vals.includes(style.overflowY)) return true;
-    if (vals.includes(style.overflowX)) return true;
-    const ov = style.overflow;
-    if (vals.includes(ov)) return true;
-    if (ov && ov.split(" ").some((v) => vals.includes(v))) return true;
-    return false;
-  };
-
-  const walk = (el) => {
-    for (const child of el.children) {
-      const style = getComputedStyle(child);
-      if (isScrollable(style)) return child;
-      const found = walk(child);
-      if (found) return found;
-    }
-    return null;
-  };
-
-  const found = walk(container);
-  if (found) return found;
-
-  // Strategy 3: scrollHeight heuristic
-  const walkScrollable = (el) => {
-    for (const child of el.children) {
-      if (child.scrollHeight > child.clientHeight + 1) {
-        const deeper = walkScrollable(child);
-        return deeper || child;
-      }
-    }
-    return null;
-  };
-
-  return walkScrollable(container) || container.firstElementChild;
-};
-
-// =============================================================================
-// Scroll Measurement
-// =============================================================================
-
-/**
- * Scroll and measure frame times over a duration.
- *
- * Uses a dual-loop architecture:
- *   1. setTimeout scroll driver (~250 updates/sec) — smooth sub-pixel scrolling
- *   2. rAF paint counter — accurate frame timing without coupling to scroll
- *
- * @param {HTMLElement} viewport - Scrollable element
- * @param {number} durationMs - Duration to scroll in milliseconds
- * @param {number} [stressMs=0] - CPU burn per frame (simulates app workload)
- * @param {number} [speedPxPerSec=7200] - Scroll speed in pixels per second
- * @returns {Promise<{medianFPS: number, medianFrameTime: number, p95FrameTime: number, totalFrames: number}>}
- */
-export const measureScrollPerformance = async (
-  viewport,
-  durationMs,
-  stressMs = 0,
-  speedPxPerSec = BASE_SCROLL_SPEED,
-) => {
-  // Guard: null viewport
-  if (!viewport) {
-    return {
-      medianFPS: 0,
-      medianFrameTime: 0,
-      p95FrameTime: 0,
-      totalFrames: 0,
-    };
-  }
-
-  const maxScroll = viewport.scrollHeight - viewport.clientHeight;
-
-  return new Promise((resolve) => {
-    const frameTimes = [];
-    let running = true;
-    let scrollPos = 0;
-    let direction = 1;
-
-    // ── Loop 1 — Paint counter (rAF) ─────────────────────────────────
-    let lastPaintTime = 0;
-
-    const paintTick = (timestamp) => {
-      if (!running) return;
-
-      if (lastPaintTime > 0) {
-        frameTimes.push(timestamp - lastPaintTime);
-      }
-      lastPaintTime = timestamp;
-
-      // Simulate additional CPU work (stress mode)
-      if (stressMs > 0) burnCpu(stressMs);
-
-      requestAnimationFrame(paintTick);
-    };
-
-    // ── Loop 2 — Scroll driver (setTimeout) ──────────────────────────
-    const scrollStartTime = performance.now();
-    let lastScrollTime = scrollStartTime;
-
-    const scrollTick = () => {
-      if (!running) return;
-
-      const now = performance.now();
-      const elapsed = now - scrollStartTime;
-
-      if (elapsed >= durationMs) {
-        running = false;
-
-        const medianFrameTime = median(frameTimes);
-        const p95FrameTime = percentile(
-          [...frameTimes].sort((a, b) => a - b),
-          95,
-        );
-        const medianFPS = frameTimes.length > 0
-          ? round(1000 / medianFrameTime, 1)
-          : 0;
-
-        resolve({
-          medianFPS,
-          medianFrameTime: round(medianFrameTime, 2),
-          p95FrameTime: round(p95FrameTime, 2),
-          totalFrames: frameTimes.length,
-        });
-        return;
-      }
-
-      // Time-based scrolling (not frame-based)
-      const dt = now - lastScrollTime;
-      lastScrollTime = now;
-
-      const pxDelta = (speedPxPerSec * dt) / 1000;
-      scrollPos += pxDelta * direction;
-
-      // Bounce at edges
-      if (scrollPos >= maxScroll) {
-        scrollPos = maxScroll;
-        direction = -1;
-      } else if (scrollPos <= 0) {
-        scrollPos = 0;
-        direction = 1;
-      }
-
-      viewport.scrollTop = scrollPos;
-
-      setTimeout(scrollTick, 0);
-    };
-
-    // Start both loops
-    requestAnimationFrame(paintTick);
-    setTimeout(scrollTick, 0);
-  });
-};
 
 // =============================================================================
 // Memory Measurement with Retries
@@ -794,9 +406,9 @@ export const measureMemoryWithRetries = async ({
 /**
  * Run the full three-phase benchmark for a single library.
  *
- * Phase 1: Timing (5 iterations, median render time)
- * Phase 2: Memory (up to 10 attempts, median of valid readings)
- * Phase 3: Scroll (7 speeds × 2 seconds each, FPS + P95 frame time)
+ * Phase 1: Timing (MEASURE_ITERATIONS iterations, median render time)
+ * Phase 2: Memory (up to MEMORY_ATTEMPTS attempts, median of valid readings)
+ * Phase 3: Scroll (SCROLL_SPEEDS.length speeds × SCROLL_DURATION_MS ms each)
  *
  * This function is library-agnostic — it takes create/destroy callbacks
  * and produces identical measurement data for every library.
@@ -811,15 +423,39 @@ export const measureMemoryWithRetries = async ({
  * @param {(instance: *) => Promise<void>} opts.destroyComponent
  * @returns {Promise<{library: string, renderTime: number, memoryUsed: number|null, scrollResults: Object[]}>}
  */
+/**
+ * Intensity presets control how thorough each measurement phase is.
+ *
+ *   quick   — fast feedback (~20s per library), fewer iterations
+ *   default — balanced accuracy/speed (~40s per library)
+ *   full    — maximum accuracy (~60s+ per library), more iterations
+ */
+export const INTENSITY_PRESETS = {
+  quick:   { warmupIterations: 1, renderIterations: 3, memoryAttempts: 3, scrollDurationMs: 1000, jumpIterations: 3 },
+  default: { warmupIterations: 2, renderIterations: 5, memoryAttempts: 5, scrollDurationMs: 1500, jumpIterations: 5 },
+  full:    { warmupIterations: 3, renderIterations: 7, memoryAttempts: 5, scrollDurationMs: 2000, jumpIterations: 7 },
+};
+
 export const benchmarkLibrary = async ({
   libraryName,
   container,
   itemCount,
   onStatus,
+  onPhaseResult,
   stressMs = 0,
+  intensity,
   createComponent,
   destroyComponent,
 }) => {
+  const preset = INTENSITY_PRESETS[intensity] || INTENSITY_PRESETS.default;
+  const {
+    warmupIterations,
+    renderIterations,
+    memoryAttempts,
+    scrollDurationMs,
+    jumpIterations,
+  } = preset;
+
   // ═══════════════════════════════════════════════════════════════════════
   // Phase 1: Render Timing
   // ═══════════════════════════════════════════════════════════════════════
@@ -830,22 +466,44 @@ export const benchmarkLibrary = async ({
   const originalVisibility = container.style.visibility;
   container.style.visibility = "hidden";
 
-  for (let i = 0; i < MEASURE_ITERATIONS; i++) {
-    onStatus(`Measuring ${libraryName} render (${i + 1}/${MEASURE_ITERATIONS})...`);
+  // Warmup: let V8's JIT optimize before measuring
+  for (let i = 0; i < warmupIterations; i++) {
+    onStatus(`Warming up ${libraryName} (${i + 1}/${warmupIterations})...`);
+    container.innerHTML = "";
+    await tryGC();
+    const inst = await createComponent(container, itemCount);
+    await nextFrame();
+    await destroyComponent(inst);
+    container.innerHTML = "";
+    await tryGC();
+  }
+
+  for (let i = 0; i < renderIterations; i++) {
+    onStatus(
+      `Measuring ${libraryName} render (${i + 1}/${renderIterations})...`,
+    );
 
     container.innerHTML = "";
     await tryGC();
+    await nextFrame();
 
     const { duration, result: instance } = await measureDuration(
       `${libraryName}-render`,
-      async () => {
-        const inst = await createComponent(container, itemCount);
-        await nextFrame();
-        return inst;
-      },
+      () => createComponent(container, itemCount),
     );
 
     renderTimes.push(duration);
+
+    // Sanity check: verify DOM was actually rendered
+    if (i === 0) {
+      const renderedItems = container.querySelectorAll("[data-index]").length;
+      if (renderedItems === 0) {
+        console.warn(`[bench] WARNING: 0 DOM items after render — virtualisation may not be working`);
+      }
+    }
+
+    await nextFrame();
+    await waitFrames(2);
 
     // Clean up this iteration
     await destroyComponent(instance);
@@ -856,6 +514,8 @@ export const benchmarkLibrary = async ({
   container.style.visibility = originalVisibility;
 
   const renderTime = round(median(renderTimes), 1);
+  onStatus(`Render times: [${renderTimes.map(t => round(t, 2)).join(", ")}] → median ${renderTime}ms`);
+  if (onPhaseResult) onPhaseResult("render", renderTime);
 
   // ═══════════════════════════════════════════════════════════════════════
   // Phase 2: Memory
@@ -869,10 +529,13 @@ export const benchmarkLibrary = async ({
     destroyFn: destroyComponent,
     onStatus,
     label: libraryName,
+    attempts: memoryAttempts,
   });
 
+  if (onPhaseResult) onPhaseResult("memory", memoryUsed);
+
   // ═══════════════════════════════════════════════════════════════════════
-  // Phase 3: Scroll Performance (7 speeds)
+  // Phase 3: Scroll Performance
   // ═══════════════════════════════════════════════════════════════════════
 
   // The memory phase left an instance mounted — reuse it for scrolling
@@ -888,7 +551,7 @@ export const benchmarkLibrary = async ({
 
     const result = await measureScrollPerformance(
       viewport,
-      SCROLL_DURATION_MS,
+      scrollDurationMs,
       stressMs,
       speed.pxPerSec,
     );
@@ -900,6 +563,27 @@ export const benchmarkLibrary = async ({
       ...result,
     });
   }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // Phase 4: Scroll-to-Index (Jump)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // Reuses the same mounted instance and viewport from the scroll phase.
+  // Measures how fast the library virtualises a new set of items when
+  // the scroll position teleports to a distant index.
+
+  const totalJumps = JUMP_TARGETS.length * jumpIterations;
+  onStatus(`Measuring ${libraryName} jump (0/${totalJumps})...`);
+
+  const jumpTime = await measureScrollToIndex(
+    viewport,
+    itemCount,
+    ITEM_HEIGHT,
+    JUMP_TARGETS,
+    jumpIterations,
+  );
+
+  onStatus(`Measuring ${libraryName} jump (${totalJumps}/${totalJumps})...`);
 
   // Clean up
   if (memInstance) {
@@ -917,13 +601,23 @@ export const benchmarkLibrary = async ({
     return arr.reduce((a, b) => a + b, 0) / arr.length;
   };
 
+  const avgFPS = round(avgFn(allFPS), 1);
+  const avgP95 = round(avgFn(allP95), 2);
+
+  if (onPhaseResult) {
+    onPhaseResult("fps", avgFPS);
+    onPhaseResult("p95", avgP95);
+    onPhaseResult("jump", jumpTime);
+  }
+
   return {
     library: libraryName,
     renderTime,
     memoryUsed,
     scrollResults,
-    avgFPS: round(avgFn(allFPS), 1),
-    avgP95: round(avgFn(allP95), 2),
+    avgFPS,
+    avgP95,
+    jumpTime,
   };
 };
 
@@ -1024,6 +718,17 @@ export const buildMetrics = (results) => {
     });
   }
 
+  // Jump time (scroll-to-index)
+  if (results.jumpTime > 0) {
+    metrics.push({
+      label: "Jump",
+      value: results.jumpTime,
+      unit: "ms",
+      better: "lower",
+      rating: rateLower(results.jumpTime, 10, 25),
+    });
+  }
+
   // Per-speed breakdown (as additional info metrics)
   for (const sr of results.scrollResults || []) {
     if (sr.medianFPS > 0) {
@@ -1082,7 +787,9 @@ export const runBenchmarks = async (options) => {
 
   const adapter = libraries.get(librarySlug);
   if (!adapter) {
-    throw new Error(`Library "${librarySlug}" is not registered. Did you import its adapter?`);
+    throw new Error(
+      `Library "${librarySlug}" is not registered. Did you import its adapter?`,
+    );
   }
 
   /** @type {BenchmarkResult[]} */
@@ -1218,59 +925,6 @@ export const persistResult = (result, extraData = {}) => {
 };
 
 // =============================================================================
-// Math Utilities
-// =============================================================================
-
-/**
- * Format bytes as human-readable MB.
- * @param {number} bytes
- * @returns {number} megabytes (2 decimal places)
- */
-export const bytesToMB = (bytes) =>
-  Math.round((bytes / (1024 * 1024)) * 100) / 100;
-
-/**
- * Compute the median of an array of numbers.
- * @param {number[]} values
- * @returns {number}
- */
-export const median = (values) => {
-  if (values.length === 0) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 !== 0
-    ? sorted[mid]
-    : (sorted[mid - 1] + sorted[mid]) / 2;
-};
-
-/**
- * Compute percentile from a sorted-ascending array using linear interpolation.
- * @param {number[]} sorted
- * @param {number} p - Percentile (0–100)
- * @returns {number}
- */
-export const percentile = (sorted, p) => {
-  if (sorted.length === 0) return 0;
-  if (sorted.length === 1) return sorted[0];
-  const index = (p / 100) * (sorted.length - 1);
-  const lower = Math.floor(index);
-  const upper = Math.ceil(index);
-  if (lower === upper) return sorted[lower];
-  return sorted[lower] + (sorted[upper] - sorted[lower]) * (index - lower);
-};
-
-/**
- * Round a number to N decimal places.
- * @param {number} value
- * @param {number} [decimals=1]
- * @returns {number}
- */
-export const round = (value, decimals = 1) => {
-  const factor = 10 ** decimals;
-  return Math.round(value * factor) / factor;
-};
-
-// =============================================================================
 // Item Generation
 // =============================================================================
 
@@ -1311,4 +965,41 @@ export const escapeHtml = (str) => {
   const div = document.createElement("div");
   div.textContent = str;
   return div.innerHTML;
+};
+
+// =============================================================================
+// Comparison: winner detection shared by compare.js
+// =============================================================================
+
+/**
+ * Determine the winner slug among a set of {slug, value} pairs for one metric.
+ *
+ * Returns:
+ *   - the winning slug  when one library is clearly better (> TIE_THRESHOLD apart)
+ *   - "__tie__"         when all values are within TIE_THRESHOLD of each other
+ *   - null              when there are fewer than 2 valid values
+ *
+ * @param {Array<{slug: string, value: number}>} entries
+ * @param {'lower'|'higher'} better
+ * @returns {string|null}
+ */
+export const pickWinner = (entries, better) => {
+  // Filter out zero / null values
+  const valid = entries.filter((e) => e.value !== null && e.value > 0);
+  if (valid.length < 2) return null;
+
+  const values = valid.map((e) => e.value);
+  const max = Math.max(...values);
+  const min = Math.min(...values);
+  const base = Math.max(Math.abs(max), Math.abs(min)) || 1;
+
+  // All within 3 % → tie
+  if ((max - min) / base < 0.03) return "__tie__";
+
+  const best =
+    better === "lower"
+      ? valid.reduce((a, b) => (b.value < a.value ? b : a))
+      : valid.reduce((a, b) => (b.value > a.value ? b : a));
+
+  return best.slug;
 };

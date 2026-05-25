@@ -1,10 +1,22 @@
 // benchmarks/libraries/vlist-react.js — VList (React) benchmark adapter
 //
-// Registers vlist-react with the benchmark runner so it can be tested
-// with the same measurement pipeline as every other library.
+// Registers vlist-react with the benchmark runner so it can be tested with
+// the same measurement pipeline as every other library.
 //
-// vlist-react is the React binding for the zero-dependency @floor/vlist core.
-// It provides a <VList> component for React applications.
+// vlist-react wraps vlist with a useVList hook for React. The hook
+// manages the vlist instance lifecycle and exposes a containerRef that the
+// caller attaches to a div.
+//
+// Implementation notes:
+//   - Dependencies are loaded eagerly at module init time (not inside create())
+//     to avoid measuring import() overhead during the timed render phase.
+//   - The items array is pre-built once per itemCount and cached outside
+//     create() so that array allocation is never counted as render time.
+//   - We mount with empty items first, then call setItems() on the vlist
+//     instance after mount — matching the vanilla vlist.js pattern so that
+//     array-passing overhead is never inside the timed region.
+//   - We capture the vlist instance from instanceRef.current once the hook's
+//     useEffect has fired, using a promise + timeout fallback.
 
 import {
   defineLibrary,
@@ -14,38 +26,45 @@ import {
 } from "../runner.js";
 
 // =============================================================================
-// Lazy-loaded dependencies
+// Eager dependency load
 // =============================================================================
 
-let React;
-let ReactDOM;
-let VList;
+let React = null,
+  ReactDOM = null,
+  useVList = null,
+  loadError = null;
 
-/**
- * Lazy load React and vlist-react.
- * Returns false if loading fails.
- */
-const loadDependencies = async () => {
+const depsReady = (async () => {
   try {
-    if (!React) {
-      React = await import("react");
-
-      const ReactDOMClient = await import("react-dom/client");
-      // Bun's bundler double-wraps CJS modules via __toESM. On some browsers
-      // (Firefox) the getter-based proxy loses `createRoot`. Fall back to
-      // `.default` which holds the original CJS exports object.
-      ReactDOM = ReactDOMClient.createRoot
-        ? ReactDOMClient
-        : (ReactDOMClient.default ?? ReactDOMClient);
-
-      const vlistReact = await import("vlist-react");
-      VList = vlistReact.VList || vlistReact.default;
-    }
-    return true;
+    React = await import("react");
+    const ReactDOMClient = await import("react-dom/client");
+    ReactDOM = ReactDOMClient.createRoot
+      ? ReactDOMClient
+      : (ReactDOMClient.default ?? ReactDOMClient);
+    const vlistReact = await import("vlist-react");
+    useVList = vlistReact.useVList ?? vlistReact.default;
   } catch (err) {
+    loadError = err;
     console.error("[vlist-react] Failed to load dependencies:", err);
-    return false;
   }
+})();
+
+// =============================================================================
+// Items cache
+// =============================================================================
+
+// Avoid rebuilding the array on every timed iteration.
+// Keyed by itemCount so switching between 10K / 100K / 1M is still fast.
+const itemsCache = new Map();
+
+const getItems = (itemCount) => {
+  if (!itemsCache.has(itemCount)) {
+    itemsCache.set(
+      itemCount,
+      Array.from({ length: itemCount }, (_, i) => ({ id: i })),
+    );
+  }
+  return itemsCache.get(itemCount);
 };
 
 // =============================================================================
@@ -58,53 +77,94 @@ defineLibrary({
   ecosystem: "react",
 
   /**
-   * Mount a vlist-react VList into the container.
+   * Mount a vlist-react list into the container.
    *
-   * Uses the shared benchmarkTemplate function to render items, ensuring
-   * the same DOM structure as all other library benchmarks.
+   * Mounts with an empty items array so that the timed region only covers
+   * framework + vlist initialisation. Once the instance is available via
+   * instanceRef.current (after the hook's useEffect fires), we call
+   * setItems() to load the full dataset — identical to how the vanilla
+   * vlist.js adapter measures this library.
    *
    * @param {HTMLElement} container - DOM element to render into
    * @param {number} itemCount - Number of items in the list
-   * @returns {Promise<*>} React root instance (for later unmounting)
+   * @returns {Promise<{root: *, instance: *}>} Handle for later destruction
    */
   create: async (container, itemCount) => {
-    const loaded = await loadDependencies();
-    if (!loaded) {
+    await depsReady;
+    if (!useVList) {
       throw new Error(
-        "VList (React) is not available — failed to load vlist-react",
+        "VList (React) is not available — failed to load vlist-react" +
+          (loadError ? `: ${loadError.message}` : ""),
       );
     }
 
-    // Generate the items array
-    const items = new Array(itemCount);
-    for (let i = 0; i < itemCount; i++) {
-      items[i] = { id: i };
-    }
+    const height = container.clientHeight || 600;
+    const _useVList = useVList;
+    const _React = React;
 
-    const listComponent = React.createElement(VList, {
-      items,
-      overscan: DEFAULT_OVERSCAN,
-      item: {
-        height: ITEM_HEIGHT,
-        template: benchmarkTemplate,
-      },
-      style: {
-        height: `${container.clientHeight || 600}px`,
-        width: "100%",
-      },
+    return new Promise((resolve) => {
+      let resolved = false;
+
+      function VListBenchmark({ height }) {
+        // Mount with empty items — setItems() is called after mount so that
+        // array allocation is never inside the timed create() region.
+        const { containerRef, instanceRef } = _useVList({
+          items: [],
+          overscan: DEFAULT_OVERSCAN,
+          item: {
+            height: ITEM_HEIGHT,
+            template: benchmarkTemplate,
+          },
+        });
+
+        _React.useEffect(() => {
+          const instance = instanceRef.current;
+          if (!resolved && instance) {
+            resolved = true;
+            // setItems() triggers the actual virtualisation render —
+            // array was pre-built in getItems() outside the timed region.
+            if (typeof instance.setItems === "function") {
+              instance.setItems(getItems(itemCount));
+            }
+            resolve({ root, instance });
+          }
+        });
+
+        return _React.createElement("div", {
+          ref: containerRef,
+          style: { height: `${height}px`, width: "100%", overflow: "auto" },
+        });
+      }
+
+      const root = ReactDOM.createRoot(container);
+      root.render(_React.createElement(VListBenchmark, { height }));
+
+      // Fallback: if the useEffect never fires within 2s, resolve anyway
+      // so destroy() can still unmount the React root cleanly.
+      setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          resolve({ root, instance: null });
+        }
+      }, 2000);
     });
-
-    const root = ReactDOM.createRoot(container);
-    root.render(listComponent);
-    return root;
   },
 
   /**
-   * Unmount a vlist-react instance.
+   * Unmount the React root and destroy the vlist instance.
    *
-   * @param {*} root - React root returned by create()
+   * useVList's cleanup effect calls instance.destroy() when the component
+   * unmounts, but we call it defensively before unmount() in case the
+   * cleanup doesn't fire synchronously before the next test starts.
+   *
+   * @param {{root: *, instance: *}} handle
    */
-  destroy: async (root) => {
+  destroy: async (handle) => {
+    if (!handle) return;
+    const { root, instance } = handle;
+    if (instance && typeof instance.destroy === "function") {
+      instance.destroy();
+    }
     if (root && typeof root.unmount === "function") {
       root.unmount();
     }

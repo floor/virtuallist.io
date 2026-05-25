@@ -6,18 +6,25 @@ Known gaps, unfinished work, and planned improvements. This document reflects th
 
 ## Missing Features
 
-### History / Trends Page
+### ~~History / Trends Page~~ → Partially resolved by Results page
 
-**What:** A page at `/benchmarks/{slug}/history` (or `/history`) that visualises the crowdsourced aggregate data over time.
+**What:** A page that surfaces crowdsourced aggregate data so visitors can see benchmark results without running benchmarks themselves.
 
-**Status:** The API endpoints are fully implemented (`/api/benchmarks/history`, `/api/benchmarks/stats`). The data is being stored. The page renderer and client-side chart do not exist yet.
+**Status:** ✅ **Partially resolved.** The **Results page** (`/benchmarks/results`) now exists. It shows a server-rendered leaderboard table with median values for all 5 core metrics, confidence badges, p5–p95 ranges, best-in-column highlighting, and filters for item count + stress level. Column headers are sortable client-side.
 
-**What it needs:**
-- A new page renderer in `src/server/pages/`
-- A route in `src/server/router.ts`
-- A client-side SVG or canvas chart drawing daily median + p5/p95 band
-- A library version selector and metric selector
-- Confidence badges (🟢 ≥20 runs, 🟡 5–19, ⚪ <5)
+**What was built:**
+- `assembleResultsPage()` in `src/server/pages/benchmarks.ts` — queries `getStats()` and `getSummary()` directly (no HTTP round-trip)
+- `benchmarks-results.eta` template — leaderboard table with confidence badges
+- `benchmarks/results.js` — lightweight (~2 KB) client-side script for filter navigation and column sorting
+- Route at `/benchmarks/results` in `src/server/router.ts`
+- Sidebar link ("📊 Results") visible on all benchmark pages
+- Sitemap entry
+
+**Still missing — time-series trends:**
+- A chart visualising performance over time (daily median + p5/p95 band)
+- The `/api/benchmarks/history` endpoint is fully implemented but no UI consumes it yet
+- A library version selector and metric selector for the chart
+- This could be added as an expansion of the results page or as a separate `/benchmarks/trends` page
 
 ---
 
@@ -25,12 +32,13 @@ Known gaps, unfinished work, and planned improvements. This document reflects th
 
 **What:** Show aggregated results from all previous visitors on the individual library benchmark page, below the controls.
 
-**Status:** Data is stored. No UI surfaces it.
+**Status:** Partially addressed. The Results page (`/benchmarks/results`) now shows aggregated data for all libraries. However, individual library pages (`/benchmarks/{slug}`) still do not show crowdsourced data inline.
 
 **What it needs:**
 - A fetch from `/api/benchmarks/stats?librarySlug={slug}&itemCount=10000` on page load
 - A "Community results" card rendered below the controls using the same `.bench-metric` component classes
 - Graceful empty state when no data exists yet
+- Alternatively, a server-side approach like the results page (call `getStats()` directly during page assembly)
 
 ---
 
@@ -90,30 +98,9 @@ The Nginx approach is sufficient for production. Development compression is a qu
 
 ## Adapters That Need Validation or Improvement
 
-### `tanstack-solid-virtual.js` — Simplified render
+### ~~`tanstack-solid-virtual.js` — Simplified render~~ ✅ Done
 
-The current implementation uses manual DOM construction rather than SolidJS's fine-grained reactivity system. The initial render is correct and measures render time and memory accurately, but the scroll phase does not exercise SolidJS's reactive update path — the list does not re-render items as the scroll position changes.
-
-**What it needs:**
-- A proper SolidJS component using `createVirtualizer` from `@tanstack/solid-virtual`
-- Compiled with Babel + `babel-preset-solid` (already in `devDependencies`)
-- The Bun build script updated to apply the Solid Babel transform to this adapter's output
-
----
-
-### `vlist-solidjs.js` — Needs API validation
-
-The adapter calls the VList component directly as a function. The actual `vlist-solidjs` package may export a Svelte-style component or require a different calling convention.
-
-**What it needs:** Running the benchmark against the live package and verifying the output. The adapter may need to be rewritten once the actual API is confirmed.
-
----
-
-### `vlist-svelte.js` — Depends on package export format
-
-The adapter handles both Svelte 4 (`$destroy()`) and Svelte 5 (`unmount()`) APIs. Whether it works depends entirely on which format `vlist-svelte` uses.
-
-**What it needs:** Running against the live package and verifying. If the package uses Svelte's component compilation differently, the adapter's instantiation logic may need to change.
+Resolved: the adapter now uses Solid's imperative reactive APIs (`createSignal`, `createEffect`) with direct DOM manipulation. The virtualizer's `getVirtualItems()` reactive store and `getTotalSize()` signal drive a `createEffect` that reconciles DOM nodes on every scroll update — exercising the real Solid reactive pipeline without needing JSX or a Babel transform.
 
 ---
 
@@ -125,52 +112,44 @@ The adapter assumes `LegendList` accepts `data`, `renderItem`, `keyExtractor`, `
 
 ---
 
-### `vlist-react.js` — Container sizing assumption
-
-The adapter passes a `style` prop with `height` and `width` to `VList`. The actual vlist-react API may size the component differently (e.g. expecting the container to handle sizing rather than the component itself).
-
-**What it needs:** Running against the live package and verifying.
-
----
-
 ## Performance Improvements
 
-### Bundle splitting per ecosystem
+### Bundle splitting per ecosystem (compare page only)
 
-**Problem:** Every visitor downloads React, ReactDOM, Vue, and SolidJS even if they only benchmark a single library. The full bundle is ~1.5 MB.
+**Problem:** The compare page downloads React, ReactDOM, Vue, and SolidJS even if the visitor only compares React libraries. The full `compare.js` bundle is ~1.5 MB.
 
-**Option:** Split `script.js` into per-ecosystem chunks. A React-only page would download React + the React adapters but not Vue or SolidJS.
+**Option:** Split `compare.js` into per-ecosystem chunks. A React-only comparison would download React + the React adapters but not Vue or SolidJS.
 
-**Complexity:** High. Would require the benchmark page to know which adapters to load before the user interacts, or load adapters on demand after the page opens. Either way, dynamic `import()` calls at runtime would need to be measured carefully to ensure they do not contaminate render timing.
+**Complexity:** High. Would require the compare page to know which adapters to load before the user interacts, or load adapters on demand after selection. Either way, dynamic `import()` calls at runtime would need to be measured carefully to ensure they do not contaminate render timing.
 
-**Current stance:** Not worth the complexity at this stage. Reconsider if the bundle grows significantly or if page load time becomes a user complaint.
+**Current stance:** Not worth the complexity at this stage. Individual library benchmark pages no longer download the large bundle (they use server-side Puppeteer), so only the compare page is affected. Reconsider if page load time becomes a user complaint.
 
 ---
 
 ### Memory phase duration
 
-**Problem:** The memory phase runs up to 10 attempts, each preceded by `settleHeap()` (3 cycles × ~650 ms = ~2 seconds). At 10 attempts, Phase 2 can take up to 20 seconds before reporting a result.
+**Problem:** The memory phase runs up to `MEMORY_ATTEMPTS` attempts, each preceded by `settleHeap()` (3 cycles × ~650 ms = ~2 seconds).
 
-**Option:** Reduce `MEMORY_ATTEMPTS` from 10 to 5 or 3. The trade-off is fewer valid readings and a higher chance of reporting `"—"` instead of a number.
-
-**Current stance:** 10 attempts with a 2-second settle per attempt was chosen for measurement accuracy. A future improvement could reduce settle time while maintaining attempt count, or show a live "attempt N/10" progress indicator to set visitor expectations.
+**Current setting:** `MEMORY_ATTEMPTS = 5` (reduced from 10). Most valid readings come in the first 3–5 attempts, and 5 gives a reliable median while cutting Phase 2 time roughly in half. The `intensity` preset system (quick/default/full) now controls this per-run. A future improvement could reduce settle time per attempt for further gains.
 
 ---
 
 ## Potential New Libraries
 
-The following libraries are worth adding as benchmark coverage grows:
+Several previously-planned libraries have been added. The following remain as candidates:
 
-| Library | Ecosystem | npm |
-|---------|-----------|-----|
-| `@tanstack/vue-virtual` | Vue | `@tanstack/vue-virtual` |
-| `vue-virtual-scroll-grid` | Vue | `vue-virtual-scroll-grid` |
-| `solid-virtual` | SolidJS | `solid-virtual` |
-| `svelte-virtual` | Svelte | `svelte-virtual` |
-| `@lit-labs/virtualizer` | Vanilla (Lit) | `@lit-labs/virtualizer` |
-| `react-virtualized` | React | `react-virtualized` |
+| Library | Ecosystem | npm | Status |
+|---------|-----------|-----|--------|
+| ~~`@tanstack/vue-virtual`~~ | Vue | `@tanstack/vue-virtual` | ✅ Added as `tanstack-vue-virtual` |
+| ~~`react-virtualized`~~ | React | `react-virtualized` | ✅ Added as `react-virtualized` |
+| `vue-virtual-scroll-grid` | Vue | `vue-virtual-scroll-grid` | Candidate |
+| `solid-virtual` | SolidJS | `solid-virtual` | Candidate |
+| `svelte-virtual` | Svelte | `svelte-virtual` | Candidate |
+| `@lit-labs/virtualizer` | Vanilla (Lit) | `@lit-labs/virtualizer` | Candidate |
 
-Each requires a registry entry and a benchmark adapter. See [adding-a-library.md](./adding-a-library.md).
+VList framework bindings (`vlist-react`, `vlist-vue`, `vlist-svelte`, `vlist-solidjs`) have also been added. Total adapter count: **15**.
+
+Each new library requires a registry entry and a benchmark adapter. See [adding-a-library.md](./adding-a-library.md).
 
 ---
 

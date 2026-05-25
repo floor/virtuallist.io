@@ -6,12 +6,7 @@
 //   bun run benchmarks/build.ts
 //   bun run benchmarks/build.ts --watch
 
-import {
-  existsSync,
-  readFileSync,
-  writeFileSync,
-  watch,
-} from "fs";
+import { existsSync, readFileSync, writeFileSync, watch } from "fs";
 import { join } from "path";
 
 const isWatch = process.argv.includes("--watch");
@@ -75,10 +70,23 @@ const frameworkDedupePlugin: import("bun").BunPlugin = {
       }
     });
 
-    // SolidJS — always resolve from project root
+    // SolidJS — resolve to browser builds (not server builds)
+    // solid-js's package.json exports use conditional exports where the
+    // default/node/module entries point to dist/server.js which throws
+    // "Client-only API called on the server side". require.resolve()
+    // runs in Bun/Node context so it picks the server entry. We
+    // explicitly map each sub-path to its browser bundle.
+    const solidBrowserMap: Record<string, string> = {
+      "solid-js": "solid-js/dist/solid.js",
+      "solid-js/web": "solid-js/web/dist/web.js",
+      "solid-js/store": "solid-js/store/dist/store.js",
+    };
+
     build.onResolve({ filter: /^solid-js(\/.*)?$/ }, (args) => {
       try {
-        const resolved = require.resolve(args.path, {
+        const browserEntry = solidBrowserMap[args.path];
+        const target = browserEntry ?? args.path;
+        const resolved = require.resolve(target, {
           paths: [PROJECT_ROOT],
         });
         return { path: resolved };
@@ -87,8 +95,9 @@ const frameworkDedupePlugin: import("bun").BunPlugin = {
       }
     });
 
-    // @floor/vlist — resolve from project root
-    build.onResolve({ filter: /^@floor\/vlist(\/.*)?$/ }, (args) => {
+    // vlist — only resolve from our benchmark adapters, not from node_modules
+    build.onResolve({ filter: /^vlist$/ }, (args) => {
+      if (args.importer?.includes("node_modules")) return undefined;
       try {
         const resolved = require.resolve(args.path, {
           paths: [PROJECT_ROOT],
@@ -135,9 +144,7 @@ function formatKB(bytes: number): string {
 function gzipSize(filePath: string): number {
   try {
     const file = Bun.file(filePath);
-    const content = new Uint8Array(
-      require("fs").readFileSync(filePath)
-    );
+    const content = new Uint8Array(require("fs").readFileSync(filePath));
     // Use Bun's built-in gzip via DecompressionStream to estimate size
     // Fallback to raw size if not available
     return Math.round(file.size * 0.3); // rough estimate
@@ -165,10 +172,23 @@ async function build(): Promise<void> {
   ensureDir(OUT_DIR);
 
   const entrypoint = join(BENCHMARKS_DIR, "script.js");
+  const compareEntrypoint = join(BENCHMARKS_DIR, "compare.js");
+  const resultsEntrypoint = join(BENCHMARKS_DIR, "results.js");
+  const headlessEntrypoint = join(BENCHMARKS_DIR, "headless.js");
   const runnerPath = join(BENCHMARKS_DIR, "runner.js");
 
   if (!existsSync(entrypoint)) {
     console.error("❌ benchmarks/script.js not found");
+    process.exit(1);
+  }
+
+  if (!existsSync(compareEntrypoint)) {
+    console.error("❌ benchmarks/compare.js not found");
+    process.exit(1);
+  }
+
+  if (!existsSync(resultsEntrypoint)) {
+    console.error("❌ benchmarks/results.js not found");
     process.exit(1);
   }
 
@@ -220,27 +240,133 @@ async function build(): Promise<void> {
     }
     console.log("  ✅ script.js");
 
-    // ── Collect CSS from page renderers (inlined) and any external CSS ──
-    // Note: CSS is currently inlined in the TypeScript renderers.
-    // If a standalone benchmarks/styles.css exists, bundle it too.
+    // ── Build compare.js (compare page entry point) ─────────────────────
+    console.log("  Building compare.js...");
+    const compareResult = await Bun.build({
+      entrypoints: [compareEntrypoint],
+      outdir: OUT_DIR,
+      ...buildOptions(),
+      plugins: [frameworkDedupePlugin],
+      define,
+    });
+
+    if (!compareResult.success) {
+      const errors = compareResult.logs.map((log) => log.message).join("\n");
+      console.error("❌ Compare build failed:\n", errors);
+      console.error("\nBuild logs:");
+      compareResult.logs.forEach((log) => {
+        console.error(`  ${log.level}: ${log.message}`);
+      });
+      process.exit(1);
+    }
+    console.log("  ✅ compare.js");
+
+    // ── Build results.js (results page entry point) ─────────────────────
+    console.log("  Building results.js...");
+    const resultsResult = await Bun.build({
+      entrypoints: [resultsEntrypoint],
+      outdir: OUT_DIR,
+      ...buildOptions(),
+      define,
+    });
+
+    if (!resultsResult.success) {
+      const errors = resultsResult.logs.map((log) => log.message).join("\n");
+      console.error("❌ Results build failed:\n", errors);
+      console.error("\nBuild logs:");
+      resultsResult.logs.forEach((log) => {
+        console.error(`  ${log.level}: ${log.message}`);
+      });
+      process.exit(1);
+    }
+    console.log("  ✅ results.js");
+
+    // ── Build headless.js (Puppeteer benchmark entry point) ─────────────
+    console.log("  Building headless.js...");
+    const headlessResult = await Bun.build({
+      entrypoints: [headlessEntrypoint],
+      outdir: OUT_DIR,
+      ...buildOptions(),
+      plugins: [frameworkDedupePlugin],
+      define,
+    });
+
+    if (!headlessResult.success) {
+      const errors = headlessResult.logs.map((log) => log.message).join("\n");
+      console.error("❌ Headless build failed:\n", errors);
+      console.error("\nBuild logs:");
+      headlessResult.logs.forEach((log) => {
+        console.error(`  ${log.level}: ${log.message}`);
+      });
+      process.exit(1);
+    }
+    console.log("  ✅ headless.js");
+
+    // ── Collect CSS ─────────────────────────────────────────────────────
+    // Bundle required stylesheets from library packages, then any local
+    // overrides. Order matters — later rules win on conflicts.
+    const cssParts: string[] = [];
+
+    // Libraries that require their own CSS to render correctly
+    const libCssPaths: Array<{ path: string; label: string }> = [
+      {
+        path: join(".", "node_modules", "vlist", "dist", "vlist.css"),
+        label: "vlist",
+      },
+      {
+        path: join(
+          ".",
+          "node_modules",
+          "vue-virtual-scroller",
+          "dist",
+          "vue-virtual-scroller.css",
+        ),
+        label: "vue-virtual-scroller",
+      },
+      {
+        path: join(".", "node_modules", "clusterize.js", "clusterize.css"),
+        label: "clusterize.js",
+      },
+    ];
+
+    for (const { path, label } of libCssPaths) {
+      if (existsSync(path)) {
+        cssParts.push(readFileSync(path, "utf-8"));
+        console.log(`  ✅ ${label} CSS (bundled)`);
+      } else {
+        console.warn(`  ⚠️  ${label} CSS not found at ${path}`);
+      }
+    }
+
     const cssPath = join(BENCHMARKS_DIR, "styles.css");
     if (existsSync(cssPath)) {
-      const raw = readFileSync(cssPath, "utf-8");
-      const minified = minifyCss(raw);
-      const cssOutPath = join(OUT_DIR, "styles.css");
+      cssParts.push(readFileSync(cssPath, "utf-8"));
+    }
+
+    const cssOutPath = join(OUT_DIR, "styles.css");
+    if (cssParts.length > 0) {
+      const minified = minifyCss(cssParts.join("\n"));
       writeFileSync(cssOutPath, minified);
-      console.log(`  ✅ styles.css (${formatKB(Buffer.byteLength(minified, "utf-8"))} KB)`);
+      console.log(
+        `  ✅ styles.css (${formatKB(Buffer.byteLength(minified, "utf-8"))} KB)`,
+      );
     } else {
-      // Write an empty styles.css placeholder so the link tag doesn't 404
-      writeFileSync(join(OUT_DIR, "styles.css"), "/* virtuallist.io benchmark styles */");
+      // Write a placeholder so the <link> tag doesn't 404
+      writeFileSync(cssOutPath, "/* virtuallist.io benchmark styles */");
     }
 
     // ── Report bundle sizes ─────────────────────────────────────────────
     const jsPath = join(OUT_DIR, "script.js");
+    const compareOutPath = join(OUT_DIR, "compare.js");
     const runnerOutPath = join(OUT_DIR, "runner.js");
+    const headlessOutPath = join(OUT_DIR, "headless.js");
 
     const jsSize = Bun.file(jsPath).size;
+    const compareSize = Bun.file(compareOutPath).size;
+    const resultsOutPath = join(OUT_DIR, "results.js");
+    const resultsSize = Bun.file(resultsOutPath).size;
     const runnerSize = Bun.file(runnerOutPath).size;
+    const headlessSize = Bun.file(headlessOutPath).size;
 
     const elapsed = (performance.now() - start).toFixed(0);
 
@@ -248,6 +374,9 @@ async function build(): Promise<void> {
   ✅ Build complete in ${elapsed}ms
 
   script.js   ${formatKB(jsSize)} KB
+  compare.js  ${formatKB(compareSize)} KB
+  results.js  ${formatKB(resultsSize)} KB
+  headless.js ${formatKB(headlessSize)} KB
   runner.js   ${formatKB(runnerSize)} KB
   Output:     ${OUT_DIR}/
     `);

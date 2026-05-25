@@ -14,7 +14,11 @@
 
 import { routeApi } from "../api/router";
 import { renderHomepage } from "./pages/home";
-import { renderBenchmarkPage } from "./pages/benchmarks";
+import {
+  renderBenchmarkPage,
+  renderComparePage,
+  renderResultsPage,
+} from "./pages/benchmarks";
 import { renderMethodologyPage } from "./pages/methodology";
 import { renderAboutPage } from "./pages/about";
 import { resolveStatic } from "./static";
@@ -30,40 +34,56 @@ function routeSystem(pathname: string): Response | null {
   return null;
 }
 
-function resolveHomepage(pathname: string): Response | null {
+function resolveHomepage(pathname: string, req: Request): Response | null {
   if (pathname === "/" || pathname === "") {
-    return renderHomepage();
+    return renderHomepage(req);
   }
   return null;
 }
 
-function resolveMethodology(pathname: string): Response | null {
+function resolveMethodology(pathname: string, req: Request): Response | null {
   if (pathname === "/methodology" || pathname === "/methodology/") {
-    return renderMethodologyPage();
+    return renderMethodologyPage(req);
   }
   return null;
 }
 
-function resolveAbout(pathname: string): Response | null {
+function resolveAbout(pathname: string, req: Request): Response | null {
   // /about → overview
   if (pathname === "/about" || pathname === "/about/") {
-    return renderAboutPage(null);
+    return renderAboutPage(null, req);
   }
   // /about/api, /about/contribute
   const match = pathname.match(/^\/about\/([a-z0-9-]+)\/?$/);
-  if (match) return renderAboutPage(match[1]);
+  if (match) return renderAboutPage(match[1], req);
   return null;
 }
 
-function resolveBenchmarks(pathname: string): Response | null {
+function resolveBenchmarks(pathname: string, req: Request): Response | null {
   // Overview page
   if (pathname === "/benchmarks" || pathname === "/benchmarks/") {
-    return renderBenchmarkPage(null);
+    return renderBenchmarkPage(null, req);
+  }
+
+  // Compare page: /benchmarks/compare
+  if (
+    pathname === "/benchmarks/compare" ||
+    pathname === "/benchmarks/compare/"
+  ) {
+    return renderComparePage(req);
+  }
+
+  // Results page: /benchmarks/results
+  if (
+    pathname === "/benchmarks/results" ||
+    pathname === "/benchmarks/results/"
+  ) {
+    return renderResultsPage(req);
   }
 
   // Individual benchmark: /benchmarks/{library-slug}
   const match = pathname.match(/^\/benchmarks\/([a-z0-9-]+)\/?$/);
-  if (match) return renderBenchmarkPage(match[1]);
+  if (match) return renderBenchmarkPage(match[1], req);
 
   return null;
 }
@@ -99,10 +119,10 @@ export function handleRequest(req: Request): Response | Promise<Response> {
   // ── Sync routes (no Promise allocation) ──
   const syncResponse =
     routeSystem(pathname) ??
-    resolveHomepage(pathname) ??
-    resolveBenchmarks(pathname) ??
-    resolveMethodology(pathname) ??
-    resolveAbout(pathname) ??
+    resolveHomepage(pathname, req) ??
+    resolveBenchmarks(pathname, req) ??
+    resolveMethodology(pathname, req) ??
+    resolveAbout(pathname, req) ??
     resolveStatic(pathname);
 
   if (syncResponse) return syncResponse;

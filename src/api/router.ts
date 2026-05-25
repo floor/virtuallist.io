@@ -13,6 +13,7 @@
 // The POST endpoint validates input, rate-limits by IP, and stores to SQLite.
 
 import { routeBenchmarks } from "./benchmarks";
+import { routeRun } from "./run";
 
 // =============================================================================
 // CORS Headers
@@ -68,6 +69,19 @@ export async function routeApi(
 
   // Strip "/api" prefix → sub-path
   const subPath = pathname.slice(4); // "/api/benchmarks/stats" → "/benchmarks/stats"
+
+  // ── Benchmark Run API (Puppeteer) ──
+  if (subPath.startsWith("/run")) {
+    try {
+      const response = await routeRun(req, url, subPath);
+      if (response) return response;
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Internal server error";
+      console.error("[api] Run route error:", message);
+      return errorResponse(message, 500);
+    }
+  }
 
   // ── Benchmarks API ──
   if (subPath.startsWith("/benchmarks")) {

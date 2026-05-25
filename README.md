@@ -1,6 +1,6 @@
 # virtuallist.io
 
-Independent, open-source benchmark platform for virtual list libraries.
+Open-source benchmark platform for virtual list libraries.
 
 **Live site:** [virtuallist.io](https://virtuallist.io)
 
@@ -13,7 +13,6 @@ Unlike benchmarks published by individual library authors, virtuallist.io has no
 ## Libraries Benchmarked
 
 ### React
-- [vlist-react](https://vlist.dev) — zero-dependency core, React binding
 - [TanStack Virtual](https://tanstack.com/virtual) — headless `useVirtualizer` hook
 - [react-window](https://react-window.vercel.app) — minimalist FixedSizeList / VariableSizeList
 - [react-virtuoso](https://virtuoso.dev) — feature-rich with auto-height, groups, tables
@@ -21,18 +20,13 @@ Unlike benchmarks published by individual library authors, virtuallist.io has no
 - [Legend List](https://github.com/LegendApp/legend-list) — item recycling, bidirectional infinite scroll
 
 ### Vue
-- [vlist-vue](https://vlist.dev) — zero-dependency core, Vue binding
 - [vue-virtual-scroller](https://github.com/Akryum/vue-virtual-scroller) — `<RecycleScroller>` with DOM recycling
 
 ### SolidJS
-- [vlist-solidjs](https://vlist.dev) — zero-dependency core, SolidJS binding
 - [TanStack Virtual (SolidJS)](https://tanstack.com/virtual) — `createVirtualizer` with fine-grained reactivity
 
-### Svelte
-- [vlist-svelte](https://vlist.dev) — zero-dependency core, Svelte binding
-
 ### Vanilla JS
-- [VList (Vanilla)](https://vlist.dev) — pure JavaScript, zero dependencies
+- [VList](https://vlist.dev) — pure JavaScript, zero dependencies
 - [Clusterize.js](https://clusterize.js.org) — lightweight DOM virtualization
 
 ## Metrics
@@ -46,13 +40,13 @@ Every benchmark run produces **4 core metrics**:
 | Scroll FPS | fps | Higher |
 | P95 Frame Time | ms | Lower |
 
-Scroll performance is tested at **7 progressive speeds** (720 px/s → 36,000 px/s) to expose performance cliffs invisible at a single speed.
+Scroll performance is tested at **5 progressive speeds** (1,800 px/s → 21,600 px/s) to expose performance cliffs invisible at a single speed.
 
 ## Methodology Highlights
 
 - **Three-phase measurement** — Timing, memory, and scroll are isolated phases
-- **5 render iterations** — Median reported to reduce noise
-- **Up to 10 memory attempts** — Negative deltas (GC artifacts) rejected
+- **3 render iterations** — Median reported to reduce noise
+- **Up to 5 memory attempts** — Negative deltas (GC artifacts) rejected
 - **Randomized execution order** — Coin flip per run eliminates JIT warmth bias
 - **GC barriers** — `tryGC()` + `waitFrames(5)` between library runs
 - **Identical DOM templates** — 7-element realistic item structure for all libraries
@@ -63,11 +57,13 @@ Scroll performance is tested at **7 progressive speeds** (720 px/s → 36,000 px
 
 ## Crowdsourced Data
 
-Every benchmark run is automatically stored in a SQLite database (fire-and-forget POST — never blocks the UI). The history page aggregates results across devices, browsers, and library versions with confidence indicators:
+Every benchmark run is automatically stored in a SQLite database (fire-and-forget POST — never blocks the UI). The **[Results page](https://virtuallist.io/benchmarks/results)** aggregates this data into a leaderboard table showing median performance across all libraries, with confidence indicators based on sample count:
 
 - 🟢 **High confidence** — ≥ 20 runs
 - 🟡 **Moderate confidence** — 5–19 runs
 - ⚪ **Low confidence** — < 5 runs
+
+Results are filterable by item count (10K / 100K / 1M) and CPU stress level (0 / 3 / 5 / 7 ms). Column headers are sortable. Best-in-column values are highlighted.
 
 ## Tech Stack
 
@@ -93,7 +89,7 @@ virtuallist.io/
 │   │   ├── registry.ts        # Library registry — central source of truth
 │   │   └── pages/
 │   │       ├── home.ts        # Homepage renderer
-│   │       ├── benchmarks.ts  # Benchmark overview + individual library pages
+│   │       ├── benchmarks.ts  # Benchmark overview, individual, compare & results pages
 │   │       └── methodology.ts # Methodology documentation page
 │   └── api/
 │       ├── router.ts          # API route dispatcher
@@ -101,6 +97,8 @@ virtuallist.io/
 ├── benchmarks/
 │   ├── runner.js              # Core measurement engine (library-agnostic)
 │   ├── script.js              # Browser entry point — wires UI and runner
+│   ├── compare.js             # Compare page — multi-library head-to-head
+│   ├── results.js             # Results page — filter controls and column sorting
 │   ├── build.ts               # Bun bundler build script
 │   └── libraries/
 │       ├── _TEMPLATE.js       # Template for new library adapters
@@ -112,11 +110,7 @@ virtuallist.io/
 │       ├── vue-virtual-scroller.js
 │       ├── tanstack-solid-virtual.js
 │       ├── clusterize.js
-│       ├── vlist.js           # VList (Vanilla)
-│       ├── vlist-react.js
-│       ├── vlist-vue.js
-│       ├── vlist-solidjs.js
-│       └── vlist-svelte.js
+│       └── vlist.js           # VList
 ├── scripts/
 │   └── seed-db.ts             # SQLite database setup
 ├── data/
@@ -155,6 +149,8 @@ Server starts at **http://localhost:3456**
 |-------|-------------|
 | `/` | Homepage |
 | `/benchmarks` | Benchmark overview (all libraries) |
+| `/benchmarks/compare` | Head-to-head live comparison |
+| `/benchmarks/results` | Crowdsourced aggregated results |
 | `/benchmarks/{slug}` | Individual library benchmark |
 | `/methodology` | Methodology documentation |
 | `/api/benchmarks` | POST — store a result |

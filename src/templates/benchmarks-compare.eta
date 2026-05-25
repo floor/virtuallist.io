@@ -1,0 +1,52 @@
+<div class="bench-page bench-compare-page">
+  <!-- Header -->
+  <header class="bench-header">
+    <div class="bench-header__top">
+      <h1 class="bench-header__title">Compare Libraries</h1>
+    </div>
+    <p class="bench-header__desc">Run any two or more libraries head-to-head under identical conditions. Same DOM template, same scroll patterns, same measurement pipeline.</p>
+    <div class="bench-header__meta">
+      <span class="bench-tag" id="cmp-chrome-tag"></span>
+      <span class="bench-tag" id="cmp-cpu-tag"></span>
+    </div>
+  </header>
+
+  <!-- Library Selector -->
+  <div class="cmp-selector" id="cmp-selector">
+    <div class="cmp-selector__header">
+      <span class="bench-controls__label">Libraries</span>
+      <button class="cmp-add-slot-btn" id="cmp-add-slot" title="Add another library">+ Add library</button>
+    </div>
+    <div class="cmp-slots" id="cmp-slots">
+      <!-- Populated by compare.js -->
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="bench-controls" id="cmp-controls">
+    <span class="bench-controls__label"><%= it.t("controls.items_label") %></span>
+    <div class="ui-segmented" id="cmp-sizes">
+      <% it.itemCounts.forEach(function(count) { %>
+      <button class="ui-segmented__btn<%= count === it.initialItemCount ? ' ui-segmented__btn--active' : '' %>" data-count="<%= count %>"><%= it.formatItemCount(count) %></button>
+      <% }) %>
+    </div>
+
+    <div class="bench-controls__sep"></div>
+    <button class="ui-btn ui-btn--primary" id="cmp-run" disabled>▶ Run Comparison</button>
+  </div>
+
+  <!-- Status & Progress -->
+  <div class="cmp-status" id="cmp-status">Select at least 2 libraries to compare.</div>
+  <div class="cmp-progress" id="cmp-progress">
+    <div class="cmp-progress__bar" id="cmp-progress-bar"></div>
+  </div>
+
+  <!-- Results (populated by compare.js) -->
+  <div id="cmp-results"></div>
+
+  <!-- Viewport (visible during benchmark execution) -->
+  <div class="bench-viewport" id="cmp-viewport">
+    <div class="bench-viewport__inner" id="cmp-viewport-inner"></div>
+    <div class="bench-viewport__label"><%= it.t("viewport_label") %></div>
+  </div>
+</div>

@@ -5,6 +5,14 @@
 //
 // vue-virtual-scroller provides a <RecycleScroller> component with DOM
 // recycling for Vue 3 applications.
+//
+// Implementation notes:
+//   - Dependencies are loaded eagerly at module init time (not inside create())
+//     to avoid measuring import() overhead during the timed render phase.
+//   - The items array (with pre-computed display data) is cached outside create()
+//     so that array construction + string computation is never measured as render time.
+//   - Vue templates need pre-computed display values (initials, title, etc.) because
+//     the template slot cannot call imported JS helper functions directly.
 
 import {
   defineLibrary,
@@ -14,89 +22,61 @@ import {
   ITEM_BADGES,
 } from "../runner.js";
 
-// =============================================================================
-// Lazy-loaded dependencies
-// =============================================================================
+let Vue = null, RecycleScroller = null, loadError = null;
 
-let Vue;
-let RecycleScroller;
-
-/**
- * Lazy load Vue and vue-virtual-scroller.
- * Returns false if loading fails.
- */
-const loadDependencies = async () => {
+const depsReady = (async () => {
   try {
-    if (!Vue) {
-      // Vue must be resolved to the compiler-included build (vue.esm-bundler.js)
-      // so that string `template` options work at runtime without .vue SFC compilation.
-      Vue = await import("vue");
-
-      const scrollerMod = await import("vue-virtual-scroller");
-      RecycleScroller = scrollerMod.RecycleScroller;
-    }
-    return true;
+    Vue = await import("vue");
+    const scrollerMod = await import("vue-virtual-scroller");
+    RecycleScroller = scrollerMod.RecycleScroller;
   } catch (err) {
+    loadError = err;
     console.error("[vue-virtual-scroller] Failed to load dependencies:", err);
-    return false;
   }
-};
+})();
 
-// =============================================================================
-// Adapter Registration
-// =============================================================================
-
-defineLibrary({
-  slug: "vue-virtual-scroller",
-  name: "vue-virtual-scroller",
-  ecosystem: "vue",
-
-  /**
-   * Mount a vue-virtual-scroller RecycleScroller into the container.
-   *
-   * Creates a Vue 3 app with the RecycleScroller component, configured
-   * to render the same realistic item template as all other libraries.
-   *
-   * @param {HTMLElement} container - DOM element to render into
-   * @param {number} itemCount - Number of items in the list
-   * @returns {Promise<*>} Vue app instance (for later unmounting)
-   */
-  create: async (container, itemCount) => {
-    const loaded = await loadDependencies();
-    if (!loaded) {
-      throw new Error(
-        "vue-virtual-scroller is not available — failed to load dependencies",
-      );
-    }
-
-    // Build the items array
-    const items = [];
-    for (let i = 0; i < itemCount; i++) {
+// Rich items cache — Vue templates need pre-computed display values.
+const itemsCache = new Map();
+const getItems = (itemCount) => {
+  if (!itemsCache.has(itemCount)) {
+    const items = Array.from({ length: itemCount }, (_, i) => {
       const n = ITEM_NAMES[i % ITEM_NAMES.length];
       const n2 = ITEM_NAMES[(i + 3) % ITEM_NAMES.length];
-      items.push({
+      return {
         id: i,
         initials: `${n[0]}${n2[0]}`,
         title: `${n} — Item ${i}`,
         sub: "Lorem ipsum dolor sit amet",
         badge: ITEM_BADGES[i % ITEM_BADGES.length],
         time: `${(i % 59) + 1}m`,
-      });
+      };
+    });
+    itemsCache.set(itemCount, items);
+  }
+  return itemsCache.get(itemCount);
+};
+
+defineLibrary({
+  slug: "vue-virtual-scroller",
+  name: "vue-virtual-scroller",
+  ecosystem: "vue",
+
+  create: async (container, itemCount) => {
+    await depsReady;
+    if (!RecycleScroller) {
+      throw new Error("vue-virtual-scroller is not available — failed to load dependencies" + (loadError ? `: ${loadError.message}` : ""));
     }
 
-    // Create a wrapper div for the Vue app to mount into
     const wrapper = document.createElement("div");
     wrapper.className = "vue-scroller-wrapper";
     wrapper.style.cssText = `height:${container.clientHeight || 600}px;width:100%;overflow:hidden;`;
     container.appendChild(wrapper);
 
     const app = Vue.createApp({
-      components: {
-        RecycleScroller,
-      },
+      components: { RecycleScroller },
       data() {
         return {
-          items,
+          items: getItems(itemCount),
           itemHeight: ITEM_HEIGHT,
         };
       },
@@ -129,19 +109,13 @@ defineLibrary({
     return { app, wrapper };
   },
 
-  /**
-   * Unmount a vue-virtual-scroller instance.
-   *
-   * @param {*} instance - Object with { app, wrapper } returned by create()
-   */
   destroy: async (instance) => {
-    if (instance) {
-      if (instance.app && typeof instance.app.unmount === "function") {
-        instance.app.unmount();
-      }
-      if (instance.wrapper && instance.wrapper.parentNode) {
-        instance.wrapper.parentNode.removeChild(instance.wrapper);
-      }
+    if (!instance) return;
+    if (instance.app && typeof instance.app.unmount === "function") {
+      instance.app.unmount();
+    }
+    if (instance.wrapper && instance.wrapper.parentNode) {
+      instance.wrapper.parentNode.removeChild(instance.wrapper);
     }
   },
 });

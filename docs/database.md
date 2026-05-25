@@ -32,7 +32,7 @@ One row per benchmark execution.
 
 ### `benchmark_metrics`
 
-One row per metric per run. A typical successful run produces 11 rows: Render, Memory, Scroll FPS, P95 Frame, and one `FPS @ {speed}` row for each of the 7 scroll speeds.
+One row per metric per run. A typical successful run produces 10 rows: Render, Memory, Scroll FPS, P95 Frame, Jump, and one `FPS @ {speed}` row for each of the 5 scroll speeds. (Auto-persisted Puppeteer runs filter out the per-speed `FPS @` rows, storing only the 5 core metrics.)
 
 | Column | Type | Constraint | Description |
 |--------|------|-----------|-------------|
@@ -99,6 +99,14 @@ WAL mode is particularly useful here because the API serves many concurrent read
 - **No pooling** — a single connection is shared. SQLite with WAL handles concurrent read access without pooling.
 - **Test isolation** — `setDbPath(path)` closes the existing connection and points to a different file. `resetDb()` does the same and restores the default path. These are exported for use in tests.
 
+### Server-side consumers
+
+The database is accessed in three ways:
+
+1. **Puppeteer auto-persist** — When a server-side benchmark run completes, the `onProgress` callback in `src/api/run.ts` intercepts the `result` event and calls `storeResult()` directly. No client-side POST is needed for individual library benchmarks. The `userAgent` is set to `"Puppeteer headless (server-side)"`.
+2. **API routes** (`/api/benchmarks/*`) — HTTP endpoints that accept or return JSON. The `POST /api/benchmarks` endpoint is still available for crowdsourced submissions from external clients.
+3. **Page renderers** — the results page (`/benchmarks/results`) calls `getStats()` and `getSummary()` directly during server-side HTML assembly, with no HTTP round-trip. This is possible because `getStats()` and `getSummary()` are exported from `src/api/benchmarks.ts` and imported by `src/server/pages/benchmarks.ts`. Both code paths share the same singleton `Database` connection.
+
 ---
 
 ## Seed Script (`scripts/seed-db.ts`)
@@ -151,7 +159,7 @@ The script:
 
 ## Storage Transaction
 
-Every `POST /api/benchmarks` request writes atomically. The `storeResult()` function wraps both inserts in a single SQLite transaction:
+Every result write (whether from Puppeteer auto-persist or `POST /api/benchmarks`) goes through `storeResult()`, which wraps both inserts in a single SQLite transaction:
 
 ```
 BEGIN

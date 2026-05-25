@@ -1,0 +1,38 @@
+<div class="bench-page" data-library="<%= it.lib.slug %>">
+  <!-- Header -->
+  <header class="bench-header">
+    <div class="bench-header__top">
+      <h1 class="bench-header__title"><%= it.lib.name %></h1>
+      <div class="bench-header__links">
+        <a href="<%= it.lib.npmUrl %>" class="bench-header__ext-link" target="_blank" rel="noopener noreferrer">npm</a>
+        <a href="<%= it.lib.github %>" class="bench-header__ext-link" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <% if (it.lib.homepage) { %>
+        <a href="<%= it.lib.homepage %>" class="bench-header__ext-link" target="_blank" rel="noopener noreferrer">Docs</a>
+        <% } %>
+      </div>
+    </div>
+    <p class="bench-header__desc"><%= it.lib.tagline %></p>
+    <div class="bench-header__meta">
+      <span class="bench-tag bench-tag--accent"><%= it.lib.ecosystem %></span>
+      <span class="bench-tag"><code><%= it.lib.npm %></code></span>
+      <span class="bench-tag" id="bench-chrome-tag"></span>
+      <span class="bench-tag" id="bench-cpu-tag"></span>
+    </div>
+  </header>
+
+  <!-- Controls -->
+  <div class="bench-controls" id="bench-controls">
+    <span class="bench-controls__label"><%= it.t("controls.items_label") %></span>
+    <div class="ui-segmented" id="bench-sizes">
+      <% it.itemCounts.forEach(function(count) { %>
+      <button class="ui-segmented__btn<%= count === it.initialItemCount ? ' ui-segmented__btn--active' : '' %>" data-count="<%= count %>"><%= it.formatItemCount(count) %></button>
+      <% }) %>
+    </div>
+
+    <div class="bench-controls__sep"></div>
+    <button class="ui-btn ui-btn--primary" id="bench-run"><%~ it.t("controls.run") %></button>
+  </div>
+
+  <!-- Benchmark Result Area (populated by SSE progress from server) -->
+  <div class="bench-suites" id="bench-suites"></div>
+</div>

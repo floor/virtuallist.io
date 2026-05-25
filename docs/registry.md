@@ -47,45 +47,47 @@ Ecosystems are displayed in this order: React → Vue → SolidJS → Svelte →
 
 ---
 
-## Current Libraries
+## Current Libraries (15)
 
 ### React
 
 | Slug | Name | npm | Order |
 |------|------|-----|-------|
-| `vlist-react` | VList (React) | `vlist-react` | 10 |
-| `tanstack-virtual` | TanStack Virtual | `@tanstack/react-virtual` | 20 |
+| `legend-list` | Legend List | `@legendapp/list` | 10 |
+| `react-virtuoso` | react-virtuoso | `react-virtuoso` | 20 |
 | `react-window` | react-window | `react-window` | 30 |
-| `react-virtuoso` | react-virtuoso | `react-virtuoso` | 40 |
-| `virtua` | Virtua | `virtua` | 50 |
-| `legend-list` | Legend List | `@legendapp/list` | 60 |
+| `react-virtualized` | react-virtualized | `react-virtualized` | 35 |
+| `tanstack-virtual` | TanStack Virtual | `@tanstack/react-virtual` | 40 |
+| `vlist-react` | VList (React) | `vlist-react` | 50 |
+| `virtua` | Virtua | `virtua` | 60 |
 
 ### Vue
 
 | Slug | Name | npm | Order |
 |------|------|-----|-------|
-| `vlist-vue` | VList (Vue) | `vlist-vue` | 100 |
-| `vue-virtual-scroller` | vue-virtual-scroller | `vue-virtual-scroller` | 110 |
+| `tanstack-vue-virtual` | TanStack Virtual (Vue) | `@tanstack/vue-virtual` | 95 |
+| `vlist-vue` | VList (Vue) | `vlist-vue` | 96 |
+| `vue-virtual-scroller` | vue-virtual-scroller | `vue-virtual-scroller` | 100 |
 
 ### SolidJS
 
 | Slug | Name | npm | Order |
 |------|------|-----|-------|
-| `vlist-solidjs` | VList (SolidJS) | `vlist-solidjs` | 200 |
-| `tanstack-solid-virtual` | TanStack Virtual (SolidJS) | `@tanstack/solid-virtual` | 210 |
+| `tanstack-solid-virtual` | TanStack Virtual (SolidJS) | `@tanstack/solid-virtual` | 200 |
+| `vlist-solidjs` | VList (SolidJS) | `vlist-solidjs` | 201 |
 
 ### Svelte
 
 | Slug | Name | npm | Order |
 |------|------|-----|-------|
-| `vlist-svelte` | VList (Svelte) | `vlist-svelte` | 300 |
+| `vlist-svelte` | VList (Svelte) | `vlist-svelte` | 250 |
 
 ### Vanilla JS
 
 | Slug | Name | npm | Order |
 |------|------|-----|-------|
-| `vlist` | VList (Vanilla) | `@floor/vlist` | 400 |
-| `clusterize` | Clusterize.js | `clusterize.js` | 410 |
+| `clusterize` | Clusterize.js | `clusterize.js` | 300 |
+| `vlist` | vlist | `vlist` | 310 |
 
 ---
 
@@ -128,10 +130,10 @@ This is useful when a library's adapter is broken or the package is abandoned, w
 The `order` field controls sort position within each ecosystem group. Gaps between values are intentional — they leave room to insert new libraries between existing ones without renumbering.
 
 Current gap pattern:
-- React libraries: 10, 20, 30, 40, 50, 60 → next available: 70
-- Vue: 100, 110 → next: 120
-- SolidJS: 200, 210 → next: 220
-- Svelte: 300 → next: 310
-- Vanilla: 400, 410 → next: 420
+- React libraries: 10, 20, 30, 35, 40, 50, 60 → next available: 70
+- Vue: 95, 96, 100 → next: 110
+- SolidJS: 200, 201 → next: 210
+- Svelte: 250 → next: 260
+- Vanilla: 300, 310 → next: 320
 
 To add a library between two existing ones, choose a value between their `order` numbers.

@@ -4,6 +4,10 @@
 // tested with the same measurement pipeline as every other library.
 //
 // TanStack Virtual provides a headless useVirtualizer hook for React.
+//
+// Implementation notes:
+//   - Dependencies are loaded eagerly at module init time (not inside create())
+//     to avoid measuring import() overhead during the timed render phase.
 
 import {
   defineLibrary,
@@ -12,41 +16,22 @@ import {
   createRealisticReactChildren,
 } from "../runner.js";
 
-// =============================================================================
-// Lazy-loaded dependencies
-// =============================================================================
+let React = null, ReactDOM = null, useVirtualizer = null, loadError = null;
 
-let React;
-let ReactDOM;
-let useVirtualizer;
-
-/**
- * Lazy load React and @tanstack/react-virtual.
- * Returns false if loading fails.
- */
-const loadDependencies = async () => {
+const depsReady = (async () => {
   try {
-    if (!React) {
-      React = await import("react");
-
-      const ReactDOMClient = await import("react-dom/client");
-      ReactDOM = ReactDOMClient.createRoot
-        ? ReactDOMClient
-        : (ReactDOMClient.default ?? ReactDOMClient);
-
-      const tanstackVirtual = await import("@tanstack/react-virtual");
-      useVirtualizer = tanstackVirtual.useVirtualizer;
-    }
-    return true;
+    React = await import("react");
+    const ReactDOMClient = await import("react-dom/client");
+    ReactDOM = ReactDOMClient.createRoot
+      ? ReactDOMClient
+      : (ReactDOMClient.default ?? ReactDOMClient);
+    const tanstackVirtual = await import("@tanstack/react-virtual");
+    useVirtualizer = tanstackVirtual.useVirtualizer;
   } catch (err) {
+    loadError = err;
     console.error("[tanstack-virtual] Failed to load dependencies:", err);
-    return false;
   }
-};
-
-// =============================================================================
-// Adapter Registration
-// =============================================================================
+})();
 
 defineLibrary({
   slug: "tanstack-virtual",
@@ -65,9 +50,9 @@ defineLibrary({
    * @returns {Promise<*>} React root instance
    */
   create: async (container, itemCount) => {
-    const loaded = await loadDependencies();
-    if (!loaded) {
-      throw new Error("TanStack Virtual is not available — failed to load dependencies");
+    await depsReady;
+    if (!useVirtualizer) {
+      throw new Error("TanStack Virtual is not available — failed to load dependencies" + (loadError ? `: ${loadError.message}` : ""));
     }
 
     const VirtualList = ({ itemCount, height }) => {
@@ -90,11 +75,7 @@ defineLibrary({
         "div",
         {
           ref: refCallback,
-          style: {
-            height: `${height}px`,
-            overflow: "auto",
-            width: "100%",
-          },
+          style: { height: `${height}px`, overflow: "auto", width: "100%" },
         },
         scrollEl
           ? React.createElement(
@@ -139,11 +120,6 @@ defineLibrary({
     return root;
   },
 
-  /**
-   * Unmount a TanStack Virtual instance.
-   *
-   * @param {*} root - React root returned by create()
-   */
   destroy: async (root) => {
     if (root && typeof root.unmount === "function") {
       root.unmount();

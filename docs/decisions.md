@@ -60,13 +60,26 @@ A record of the significant architectural and design choices made during the ini
 
 ---
 
-## Bundle all frameworks together in one script.js
+## Server-side Puppeteer execution for individual library benchmarks
 
-**Decision:** `dist/benchmarks/script.js` contains React, ReactDOM, Vue (runtime + compiler), SolidJS, and all 13 library adapters in a single ~1.5 MB file.
+**Decision:** Individual library benchmarks (`/benchmarks/{slug}`) run server-side in headless Chrome via Puppeteer. The browser page triggers a run via `POST /api/run` and receives progress via SSE. Compare page benchmarks still run client-side.
 
-**Why:** The alternative — loading framework code dynamically when each benchmark page is opened — would add a network round-trip that contaminates the initial render time measurement. A benchmark that measures "how fast does the library render?" should not include "how long does the browser take to fetch the library's code?" in that number.
+**Why:**
+- Eliminates hardware variance between visitors. A benchmark run on the server always uses the same CPU, the same Chrome flags (`--disable-frame-rate-limit`, `--enable-precise-memory-info`, `--js-flags=--expose-gc`), and the same controlled environment. Results are reproducible and comparable across submissions.
+- Visitors no longer need to download ~1.5 MB of framework code just to benchmark a single library.
+- Explicit GC control and uncapped rAF produce cleaner measurements than any visitor's browser can.
 
-**Trade-off:** The first visit to any benchmark page downloads 1.5 MB. This is large but only happens once per browser cache. On subsequent visits the bundle is served from cache.
+**Trade-off:** Benchmarks are limited to one-at-a-time (CPU contention skews results), so concurrent visitors must queue. The compare page still runs client-side because head-to-head comparisons benefit from running on the same machine in the same conditions — which is guaranteed when everything runs in a single browser tab.
+
+---
+
+## Bundle all frameworks together in headless.js and compare.js
+
+**Decision:** `dist/benchmarks/headless.js` (Puppeteer) and `dist/benchmarks/compare.js` (client-side) each contain React, ReactDOM, Vue (runtime + compiler), SolidJS, and all 15 library adapters in a single ~1.5 MB file.
+
+**Why:** The alternative — loading framework code dynamically when each benchmark starts — would add a network round-trip that contaminates the initial render time measurement. A benchmark that measures "how fast does the library render?" should not include "how long does the browser take to fetch the library's code?" in that number.
+
+**Trade-off:** The compare page still downloads ~1.5 MB on first visit. This is large but only happens once per browser cache. The headless bundle size is irrelevant since it runs on the server.
 
 ---
 
@@ -84,7 +97,7 @@ A record of the significant architectural and design choices made during the ini
 
 **Decision:** Scroll measurement uses two separate loops: a `setTimeout(fn, 0)` loop that advances `scrollTop`, and a `requestAnimationFrame` loop that records frame delivery timestamps.
 
-**Why:** Coupling scroll updates to `requestAnimationFrame` produces visible stepping at slow scroll speeds. At 60fps with 720 px/s (the crawl speed), each frame would jump exactly 12px. Real user scrolling is smooth because the OS delivers scroll events much faster than the display refresh rate. `setTimeout(0)` fires approximately 250 times per second in Chrome, giving sub-pixel smooth movement at all seven speed levels.
+**Why:** Coupling scroll updates to `requestAnimationFrame` produces visible stepping at slow scroll speeds. At 60fps with 1,800 px/s (gentle speed), each frame would jump exactly 30px. Real user scrolling is smooth because the OS delivers scroll events much faster than the display refresh rate. `setTimeout(0)` fires approximately 250 times per second in Chrome, giving sub-pixel smooth movement at all five speed levels.
 
 The two loops serve different purposes and should not be entangled: the rAF loop measures time, the setTimeout loop moves the viewport.
 
@@ -92,13 +105,13 @@ The two loops serve different purposes and should not be entangled: the rAF loop
 
 ---
 
-## Fire-and-forget result persistence
+## Auto-persist from the server (no client-side POST needed)
 
-**Decision:** `persistResult()` calls `fetch()` and immediately attaches `.catch(() => {})`. Errors are silently swallowed.
+**Decision:** When a Puppeteer benchmark run completes, the server's `onProgress` callback intercepts the `result` event and calls `storeResult()` directly — no client-side POST is needed for individual library benchmarks.
 
-**Why:** A benchmark result that the visitor just measured belongs to them. If the server is unreachable, if the request times out, if the server returns an error — none of that should affect the visitor's experience of viewing their results. The benchmark UI must never wait on network activity.
+**Why:** Since benchmarks now run server-side, the server already has the result data in memory when the run completes. Persisting it directly eliminates a network round-trip and removes the possibility of data loss from client-side failures.
 
-**Trade-off:** Failed submissions are lost silently. There is no retry, no offline queue, no notification to the visitor. For a crowdsourced dataset this is acceptable — a few missed submissions do not affect the statistical value of thousands of others.
+**Trade-off:** The legacy `POST /api/benchmarks` endpoint is still supported for crowdsourced submissions from external clients and the compare page's client-side flow. The `persistResult()` function still exists in `runner.js` for this purpose.
 
 ---
 

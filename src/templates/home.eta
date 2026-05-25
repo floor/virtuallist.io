@@ -1,0 +1,68 @@
+<section class="hero">
+  <div class="hero__inner">
+    <div class="hero__badge"><%= it.t("hero.badge") %></div>
+    <h1 class="hero__title"><%~ it.t("hero.title").replace("\n", "<br>") %></h1>
+    <p class="hero__subtitle"><%~ it.t("hero.subtitle", { count: it.count }) %></p>
+    <div class="hero__actions">
+      <a href="/benchmarks" class="hero__btn hero__btn--primary"><%= it.t("hero.cta_primary") %></a>
+      <a href="/methodology" class="hero__btn hero__btn--secondary"><%= it.t("hero.cta_secondary") %></a>
+    </div>
+  </div>
+</section>
+
+<section class="libs">
+  <div class="libs__inner">
+    <h2 class="section-title"><%= it.t("libraries.title") %></h2>
+    <p class="section-desc"><%= it.t("libraries.desc") %></p>
+    <% it.ecosystems.forEach(function(group) { %>
+    <div class="libs__ecosystem">
+      <h3 class="libs__ecosystem-label"><%= group.label %></h3>
+      <div class="libs__grid">
+        <% group.libs.forEach(function(lib) { %>
+        <a href="/benchmarks/<%= lib.slug %>" class="lib-card">
+          <div class="lib-card__header">
+            <span class="lib-card__name"><%= lib.name %></span>
+          </div>
+          <p class="lib-card__tagline"><%= lib.tagline %></p>
+          <div class="lib-card__links">
+            <span class="lib-card__npm"><%= lib.npm %></span>
+          </div>
+        </a>
+        <% }) %>
+      </div>
+    </div>
+    <% }) %>
+  </div>
+</section>
+
+<section class="features">
+  <div class="features__inner">
+    <h2 class="section-title"><%= it.t("features.title") %></h2>
+    <div class="features__grid">
+      <% it.features.forEach(function(f) { %>
+      <div class="feature-card">
+        <div class="feature-card__icon"><%= f.icon %></div>
+        <h3 class="feature-card__title"><%= it.t("features." + f.titleKey) %></h3>
+        <p class="feature-card__desc"><%= it.t("features." + f.descKey) %></p>
+      </div>
+      <% }) %>
+    </div>
+  </div>
+</section>
+
+<section class="how-it-works">
+  <div class="how-it-works__inner">
+    <h2 class="section-title"><%= it.t("how.title") %></h2>
+    <div class="steps">
+      <% it.steps.forEach(function(step, i) { %>
+      <div class="step">
+        <div class="step__number"><%= i + 1 %></div>
+        <div class="step__content">
+          <h3 class="step__title"><%= it.t("how." + step.titleKey) %></h3>
+          <p class="step__desc"><%= it.t("how." + step.descKey) %></p>
+        </div>
+      </div>
+      <% }) %>
+    </div>
+  </div>
+</section>

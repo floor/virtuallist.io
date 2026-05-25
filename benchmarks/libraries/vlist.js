@@ -1,11 +1,16 @@
-// benchmarks/libraries/vlist.js — VList (Vanilla) benchmark adapter
+// benchmarks/libraries/vlist.js — VList benchmark adapter
 //
-// Registers the zero-dependency vanilla JS @floor/vlist with the benchmark
-// runner so it can be tested with the same measurement pipeline as every
-// other library.
+// Registers the zero-dependency vlist with the benchmark runner so it
+// can be tested with the same measurement pipeline as every other library.
 //
 // VList is a pure JavaScript virtual list with no framework dependencies.
 // It uses a template function to render items as HTML strings.
+//
+// Implementation notes:
+//   - Dependencies are loaded eagerly at module init time (not inside create())
+//     to avoid measuring import() overhead during the timed render phase.
+//   - The items array is pre-built once per itemCount and cached; array
+//     construction at 1M items is non-trivial and must not be measured.
 
 import {
   defineLibrary,
@@ -15,26 +20,38 @@ import {
 } from "../runner.js";
 
 // =============================================================================
-// Lazy-loaded dependencies
+// Eager dependency load
 // =============================================================================
 
-let vlist;
+let createVList = null;
+let loadError = null;
 
-/**
- * Lazy load @floor/vlist.
- * Returns false if loading fails.
- */
-const loadDependencies = async () => {
+// Load once at module evaluation time so the import() cost is never inside
+// a timed create() call.
+const depsReady = (async () => {
   try {
-    if (!vlist) {
-      const mod = await import("@floor/vlist");
-      vlist = mod.vlist || mod.default || mod;
-    }
-    return true;
+    const mod = await import("vlist");
+    createVList = mod.createVList;
   } catch (err) {
-    console.error("[vlist] Failed to load dependencies:", err);
-    return false;
+    loadError = err;
+    console.error("[vlist] Failed to load vlist:", err);
   }
+})();
+
+// =============================================================================
+// Items cache
+// =============================================================================
+
+// Avoid rebuilding the array on every timed iteration.
+// Keyed by itemCount so switching between 10K / 100K / 1M is still fast.
+const itemsCache = new Map();
+
+const getItems = (itemCount) => {
+  if (!itemsCache.has(itemCount)) {
+    const items = Array.from({ length: itemCount }, (_, i) => ({ id: i }));
+    itemsCache.set(itemCount, items);
+  }
+  return itemsCache.get(itemCount);
 };
 
 // =============================================================================
@@ -43,36 +60,30 @@ const loadDependencies = async () => {
 
 defineLibrary({
   slug: "vlist",
-  name: "VList (Vanilla)",
+  name: "VList",
   ecosystem: "vanilla",
 
   /**
    * Mount a VList instance into the container.
-   *
-   * Uses the shared benchmarkTemplate function to render items, ensuring
-   * the same DOM structure as all other library benchmarks.
    *
    * @param {HTMLElement} container - DOM element to render into
    * @param {number} itemCount - Number of items in the list
    * @returns {Promise<*>} VList instance (for later destruction)
    */
   create: async (container, itemCount) => {
-    const loaded = await loadDependencies();
-    if (!loaded) {
+    await depsReady;
+
+    if (!createVList) {
       throw new Error(
-        "VList (Vanilla) is not available — failed to load @floor/vlist",
+        "VList is not available -- failed to load vlist" +
+          (loadError ? `: ${loadError.message}` : ""),
       );
     }
 
-    // Generate the items array
-    const items = new Array(itemCount);
-    for (let i = 0; i < itemCount; i++) {
-      items[i] = { id: i };
-    }
-
-    const list = vlist(container, {
-      items,
+    const list = createVList({
+      container,
       overscan: DEFAULT_OVERSCAN,
+      items: getItems(itemCount),
       item: {
         height: ITEM_HEIGHT,
         template: benchmarkTemplate,

@@ -11,10 +11,10 @@ Independent, open-source benchmark platform for virtual list libraries.
 | [architecture.md](./architecture.md) | Repository structure, tech stack, request flow overview |
 | [server.md](./server.md) | Server entry point, router, config, shell template, static files, sitemap |
 | [registry.md](./registry.md) | Library registry — the central source of truth for all benchmarked libraries |
-| [pages.md](./pages.md) | Page renderers: homepage, benchmark overview, individual library pages, methodology, about section |
+| [pages.md](./pages.md) | Page renderers: homepage, benchmark overview, individual library pages, compare, results, methodology, about section |
 | [api.md](./api.md) | REST API: endpoints, validation, rate limiting, storage, aggregation queries |
-| [benchmark-engine.md](./benchmark-engine.md) | Client-side runner: measurement pipeline, three phases, scroll, memory, timing |
-| [library-adapters.md](./library-adapters.md) | How adapters work, all 13 current adapters, fairness requirements |
+| [benchmark-engine.md](./benchmark-engine.md) | Server-side Puppeteer runner: measurement pipeline, intensity presets, five phases |
+| [library-adapters.md](./library-adapters.md) | How adapters work, all 15 current adapters, fairness requirements |
 | [database.md](./database.md) | SQLite schema, indexes, seed script |
 | [build.md](./build.md) | Bun bundler build, framework deduplication, watch mode |
 | [styling.md](./styling.md) | CSS strategy, theme tokens, BEM naming, page-specific styles |

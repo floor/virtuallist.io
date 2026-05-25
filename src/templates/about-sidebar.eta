@@ -1,0 +1,5 @@
+<aside class="about-sidebar">
+  <% it.sidebarItems.forEach(function(item) { %>
+  <a href="<%= item.href %>" class="about-sidebar__link<%= item.slug === it.activeSlug ? ' about-sidebar__link--active' : '' %>"><%= it.t("sidebar." + item.slug) %></a>
+  <% }) %>
+</aside>

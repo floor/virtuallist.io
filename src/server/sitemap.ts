@@ -41,6 +41,18 @@ function buildEntries(): SitemapEntry[] {
       changefreq: "weekly",
       priority: "0.9",
     },
+    // Compare page
+    {
+      loc: `${SITE}/benchmarks/compare`,
+      changefreq: "weekly",
+      priority: "0.85",
+    },
+    // Results page (crowdsourced aggregated data)
+    {
+      loc: `${SITE}/benchmarks/results`,
+      changefreq: "daily",
+      priority: "0.85",
+    },
     // Methodology
     {
       loc: `${SITE}/methodology`,

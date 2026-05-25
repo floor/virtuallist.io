@@ -1,0 +1,365 @@
+<div class="meth">
+  <header class="meth__header">
+    <h1 class="meth__title"><%= it.t("header.title") %></h1>
+    <p class="meth__subtitle"><%~ it.t("header.subtitle") %></p>
+  </header>
+
+  <!-- ── Overview ──────────────────────────────────────────────────── -->
+  <section class="meth__section">
+    <h2 class="meth__section-title"><%= it.t("overview.title") %></h2>
+    <p class="meth__text"><%~ it.t("overview.p1") %></p>
+    <p class="meth__text"><%~ it.t("overview.p2") %></p>
+  </section>
+
+  <!-- ── 4 Metrics ─────────────────────────────────────────────────── -->
+  <section class="meth__section">
+    <h2 class="meth__section-title"><%= it.t("metrics.title") %></h2>
+    <p class="meth__text"><%~ it.t("metrics.intro") %></p>
+
+    <div class="meth__metrics-grid">
+      <div class="meth__metric-card">
+        <div class="meth__metric-icon">⚡</div>
+        <h3 class="meth__metric-name"><%= it.t("metrics.render_name") %></h3>
+        <p class="meth__metric-unit"><%= it.t("metrics.render_unit") %></p>
+        <p class="meth__metric-desc"><%~ it.t("metrics.render_desc") %></p>
+      </div>
+
+      <div class="meth__metric-card">
+        <div class="meth__metric-icon">🧠</div>
+        <h3 class="meth__metric-name"><%= it.t("metrics.memory_name") %></h3>
+        <p class="meth__metric-unit"><%= it.t("metrics.memory_unit") %></p>
+        <p class="meth__metric-desc"><%~ it.t("metrics.memory_desc") %></p>
+      </div>
+
+      <div class="meth__metric-card">
+        <div class="meth__metric-icon">📊</div>
+        <h3 class="meth__metric-name"><%= it.t("metrics.fps_name") %></h3>
+        <p class="meth__metric-unit"><%= it.t("metrics.fps_unit") %></p>
+        <p class="meth__metric-desc"><%~ it.t("metrics.fps_desc") %></p>
+      </div>
+
+      <div class="meth__metric-card">
+        <div class="meth__metric-icon">🎯</div>
+        <h3 class="meth__metric-name"><%= it.t("metrics.p95_name") %></h3>
+        <p class="meth__metric-unit"><%= it.t("metrics.p95_unit") %></p>
+        <p class="meth__metric-desc"><%~ it.t("metrics.p95_desc") %></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Three-Phase Architecture ──────────────────────────────────── -->
+  <section class="meth__section">
+    <h2 class="meth__section-title"><%= it.t("phases.title") %></h2>
+    <p class="meth__text"><%~ it.t("phases.intro") %></p>
+
+    <div class="meth__phases">
+      <div class="meth__phase">
+        <div class="meth__phase-number">1</div>
+        <div class="meth__phase-content">
+          <h3 class="meth__phase-title"><%= it.t("phases.timing_title") %></h3>
+          <p class="meth__phase-desc"><%~ it.t("phases.timing_desc") %></p>
+        </div>
+      </div>
+
+      <div class="meth__phase">
+        <div class="meth__phase-number">2</div>
+        <div class="meth__phase-content">
+          <h3 class="meth__phase-title"><%= it.t("phases.memory_title") %></h3>
+          <p class="meth__phase-desc"><%~ it.t("phases.memory_desc") %></p>
+        </div>
+      </div>
+
+      <div class="meth__phase">
+        <div class="meth__phase-number">3</div>
+        <div class="meth__phase-content">
+          <h3 class="meth__phase-title"><%= it.t("phases.scroll_title") %></h3>
+          <p class="meth__phase-desc"><%~ it.t("phases.scroll_desc") %></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Fairness Guarantees ───────────────────────────────────────── -->
+  <section class="meth__section">
+    <h2 class="meth__section-title"><%= it.t("fairness.title") %></h2>
+    <p class="meth__text"><%~ it.t("fairness.intro") %></p>
+
+    <div class="meth__list">
+      <div class="meth__list-item">
+        <strong><%= it.t("fairness.order_label") %></strong>
+        <span><%~ it.t("fairness.order_desc") %></span>
+      </div>
+      <div class="meth__list-item">
+        <strong><%= it.t("fairness.gc_label") %></strong>
+        <span><%~ it.t("fairness.gc_desc") %></span>
+      </div>
+      <div class="meth__list-item">
+        <strong><%= it.t("fairness.template_label") %></strong>
+        <span><%~ it.t("fairness.template_desc") %></span>
+      </div>
+      <div class="meth__list-item">
+        <strong><%= it.t("fairness.dimensions_label") %></strong>
+        <span><%~ it.t("fairness.dimensions_desc") %></span>
+      </div>
+      <div class="meth__list-item">
+        <strong><%= it.t("fairness.container_label") %></strong>
+        <span><%~ it.t("fairness.container_desc") %></span>
+      </div>
+      <div class="meth__list-item">
+        <strong><%= it.t("fairness.overscan_label") %></strong>
+        <span><%~ it.t("fairness.overscan_desc") %></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Scroll Speed Testing ──────────────────────────────────────── -->
+  <section class="meth__section">
+    <h2 class="meth__section-title"><%= it.t("speeds.title") %></h2>
+    <p class="meth__text"><%~ it.t("speeds.intro") %></p>
+
+    <div class="meth__table-wrapper">
+      <table class="meth__table">
+        <thead>
+          <tr>
+            <th><%= it.t("speeds.col_level") %></th>
+            <th><%= it.t("speeds.col_speed") %></th>
+            <th><%= it.t("speeds.col_desc") %></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>0.25×</td><td>1,800 px/s</td><td><%= it.t("speeds.gentle") %></td></tr>
+          <tr><td>0.5×</td><td>3,600 px/s</td><td><%= it.t("speeds.slow") %></td></tr>
+          <tr><td>1×</td><td>7,200 px/s</td><td><%= it.t("speeds.normal") %></td></tr>
+          <tr><td>2×</td><td>14,400 px/s</td><td><%= it.t("speeds.fast") %></td></tr>
+          <tr><td>3×</td><td>21,600 px/s</td><td><%= it.t("speeds.aggressive") %></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="meth__text meth__text--note"><%~ it.t("speeds.note") %></p>
+  </section>
+
+  <!-- ── Stress Testing ────────────────────────────────────────────── -->
+  <section class="meth__section">
+    <h2 class="meth__section-title"><%= it.t("stress.title") %></h2>
+    <p class="meth__text"><%~ it.t("stress.p1") %></p>
+
+    <div class="meth__table-wrapper">
+      <table class="meth__table">
+        <thead>
+          <tr>
+            <th><%= it.t("stress.col_level") %></th>
+            <th><%= it.t("stress.col_burn") %></th>
+            <th><%= it.t("stress.col_budget") %></th>
+            <th><%= it.t("stress.col_use") %></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>None</td><td>0 ms</td><td>8.33 ms</td><td><%= it.t("stress.none_use") %></td></tr>
+          <tr><td>Light</td><td>3 ms</td><td>5.33 ms</td><td><%= it.t("stress.light_use") %></td></tr>
+          <tr><td>Medium</td><td>5 ms</td><td>3.33 ms</td><td><%= it.t("stress.medium_use") %></td></tr>
+          <tr><td>Heavy</td><td>7 ms</td><td>1.33 ms</td><td><%= it.t("stress.heavy_use") %></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="meth__text"><%~ it.t("stress.p2") %></p>
+  </section>
+
+  <!-- ── Memory Measurement Details ────────────────────────────────── -->
+  <section class="meth__section">
+    <h2 class="meth__section-title"><%= it.t("memory_detail.title") %></h2>
+    <p class="meth__text"><%~ it.t("memory_detail.p1") %></p>
+
+    <h3 class="meth__subsection-title"><%= it.t("memory_detail.strategy_title") %></h3>
+    <div class="meth__list">
+      <div class="meth__list-item">
+        <strong><%= it.t("memory_detail.settling_label") %></strong>
+        <span><%~ it.t("memory_detail.settling_desc") %></span>
+      </div>
+      <div class="meth__list-item">
+        <strong><%= it.t("memory_detail.delta_label") %></strong>
+        <span><%~ it.t("memory_detail.delta_desc") %></span>
+      </div>
+      <div class="meth__list-item">
+        <strong><%= it.t("memory_detail.rejection_label") %></strong>
+        <span><%~ it.t("memory_detail.rejection_desc") %></span>
+      </div>
+      <div class="meth__list-item">
+        <strong><%= it.t("memory_detail.retries_label") %></strong>
+        <span><%~ it.t("memory_detail.retries_desc") %></span>
+      </div>
+      <div class="meth__list-item">
+        <strong><%= it.t("memory_detail.gentle_label") %></strong>
+        <span><%~ it.t("memory_detail.gentle_desc") %></span>
+      </div>
+    </div>
+
+    <h3 class="meth__subsection-title"><%= it.t("memory_detail.limits_title") %></h3>
+    <p class="meth__text"><%~ it.t("memory_detail.limits_p") %></p>
+  </section>
+
+  <!-- ── Dual-Loop Scroll Architecture ─────────────────────────────── -->
+  <section class="meth__section">
+    <h2 class="meth__section-title"><%= it.t("scroll_arch.title") %></h2>
+    <p class="meth__text"><%~ it.t("scroll_arch.p1") %></p>
+
+    <div class="meth__diagram">
+      <div class="meth__diagram-box">
+        <div class="meth__diagram-label"><%= it.t("scroll_arch.loop1_label") %></div>
+        <p><code><%= it.t("scroll_arch.loop1_api") %></code></p>
+        <p><%~ it.t("scroll_arch.loop1_desc").replace(/\n/g, "<br>") %></p>
+      </div>
+      <div class="meth__diagram-separator">+</div>
+      <div class="meth__diagram-box">
+        <div class="meth__diagram-label"><%= it.t("scroll_arch.loop2_label") %></div>
+        <p><code><%= it.t("scroll_arch.loop2_api") %></code></p>
+        <p><%~ it.t("scroll_arch.loop2_desc").replace(/\n/g, "<br>") %></p>
+      </div>
+    </div>
+
+    <p class="meth__text"><%~ it.t("scroll_arch.p2") %></p>
+  </section>
+
+  <!-- ── Crowdsourced Data ─────────────────────────────────────────── -->
+  <section class="meth__section">
+    <h2 class="meth__section-title"><%= it.t("crowdsourced.title") %></h2>
+    <p class="meth__text"><%~ it.t("crowdsourced.p1") %></p>
+
+    <h3 class="meth__subsection-title"><%= it.t("crowdsourced.collected_title") %></h3>
+    <div class="meth__list">
+      <div class="meth__list-item">
+        <strong><%= it.t("crowdsourced.metrics_label") %></strong>
+        <span><%~ it.t("crowdsourced.metrics_desc") %></span>
+      </div>
+      <div class="meth__list-item">
+        <strong><%= it.t("crowdsourced.library_label") %></strong>
+        <span><%~ it.t("crowdsourced.library_desc") %></span>
+      </div>
+      <div class="meth__list-item">
+        <strong><%= it.t("crowdsourced.env_label") %></strong>
+        <span><%~ it.t("crowdsourced.env_desc") %></span>
+      </div>
+      <div class="meth__list-item">
+        <strong><%= it.t("crowdsourced.config_label") %></strong>
+        <span><%~ it.t("crowdsourced.config_desc") %></span>
+      </div>
+    </div>
+
+    <h3 class="meth__subsection-title"><%= it.t("crowdsourced.not_collected_title") %></h3>
+    <p class="meth__text"><%~ it.t("crowdsourced.not_collected_p") %></p>
+
+    <h3 class="meth__subsection-title"><%= it.t("crowdsourced.confidence_title") %></h3>
+    <p class="meth__text"><%~ it.t("crowdsourced.confidence_intro") %></p>
+    <div class="meth__list">
+      <div class="meth__list-item">
+        <strong><%~ it.t("crowdsourced.high_label") %></strong>
+        <span><%= it.t("crowdsourced.high_desc") %></span>
+      </div>
+      <div class="meth__list-item">
+        <strong><%~ it.t("crowdsourced.moderate_label") %></strong>
+        <span><%= it.t("crowdsourced.moderate_desc") %></span>
+      </div>
+      <div class="meth__list-item">
+        <strong><%~ it.t("crowdsourced.low_label") %></strong>
+        <span><%= it.t("crowdsourced.low_desc") %></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Limitations ───────────────────────────────────────────────── -->
+  <section class="meth__section">
+    <h2 class="meth__section-title"><%= it.t("limitations.title") %></h2>
+    <p class="meth__text"><%~ it.t("limitations.p1") %></p>
+
+    <h3 class="meth__subsection-title"><%= it.t("limitations.not_tested_title") %></h3>
+    <div class="meth__list">
+      <div class="meth__list-item">
+        <strong><%= it.t("limitations.templates_label") %></strong>
+        <span><%= it.t("limitations.templates_desc") %></span>
+      </div>
+      <div class="meth__list-item">
+        <strong><%= it.t("limitations.variable_label") %></strong>
+        <span><%= it.t("limitations.variable_desc") %></span>
+      </div>
+      <div class="meth__list-item">
+        <strong><%= it.t("limitations.interactions_label") %></strong>
+        <span><%= it.t("limitations.interactions_desc") %></span>
+      </div>
+      <div class="meth__list-item">
+        <strong><%= it.t("limitations.mobile_label") %></strong>
+        <span><%= it.t("limitations.mobile_desc") %></span>
+      </div>
+      <div class="meth__list-item">
+        <strong><%= it.t("limitations.ssr_label") %></strong>
+        <span><%= it.t("limitations.ssr_desc") %></span>
+      </div>
+    </div>
+
+    <h3 class="meth__subsection-title"><%= it.t("limitations.partial_title") %></h3>
+    <div class="meth__list">
+      <div class="meth__list-item">
+        <strong><%= it.t("limitations.overhead_label") %></strong>
+        <span><%= it.t("limitations.overhead_desc") %></span>
+      </div>
+      <div class="meth__list-item">
+        <strong><%= it.t("limitations.bundle_label") %></strong>
+        <span><%= it.t("limitations.bundle_desc") %></span>
+      </div>
+    </div>
+
+    <p class="meth__text"><%= it.t("limitations.p2") %></p>
+  </section>
+
+  <!-- ── Browser Requirements ──────────────────────────────────────── -->
+  <section class="meth__section">
+    <h2 class="meth__section-title"><%= it.t("browsers.title") %></h2>
+    <div class="meth__list">
+      <div class="meth__list-item">
+        <strong><%= it.t("browsers.chrome_label") %></strong>
+        <span><%~ it.t("browsers.chrome_desc") %></span>
+      </div>
+      <div class="meth__list-item">
+        <strong><%= it.t("browsers.firefox_label") %></strong>
+        <span><%~ it.t("browsers.firefox_desc") %></span>
+      </div>
+      <div class="meth__list-item">
+        <strong><%= it.t("browsers.safari_label") %></strong>
+        <span><%~ it.t("browsers.safari_desc") %></span>
+      </div>
+      <div class="meth__list-item">
+        <strong><%= it.t("browsers.edge_label") %></strong>
+        <span><%~ it.t("browsers.edge_desc") %></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Contributing ──────────────────────────────────────────────── -->
+  <section class="meth__section">
+    <h2 class="meth__section-title"><%= it.t("contributing.title") %></h2>
+    <p class="meth__text"><%~ it.t("contributing.p1") %></p>
+    <div class="meth__list">
+      <div class="meth__list-item">
+        <strong><%= it.t("contributing.add_label") %></strong>
+        <span><%= it.t("contributing.add_desc") %></span>
+      </div>
+      <div class="meth__list-item">
+        <strong><%= it.t("contributing.report_label") %></strong>
+        <span><%= it.t("contributing.report_desc") %></span>
+      </div>
+      <div class="meth__list-item">
+        <strong><%= it.t("contributing.improve_label") %></strong>
+        <span><%= it.t("contributing.improve_desc") %></span>
+      </div>
+      <div class="meth__list-item">
+        <strong><%= it.t("contributing.run_label") %></strong>
+        <span><%= it.t("contributing.run_desc") %></span>
+      </div>
+    </div>
+    <p class="meth__text">
+      <a href="https://github.com/floor/virtuallist.io" class="meth__link" target="_blank" rel="noopener noreferrer">
+        <%~ it.t("contributing.github_link") %>
+      </a>
+    </p>
+  </section>
+</div>

@@ -1,8 +1,24 @@
 # Page Renderers
 
-Four page renderers live in `src/server/pages/`. Each one is a TypeScript function that builds an HTML content string and passes it to `renderShell()` to produce a complete document. Rendered HTML is cached in a module-level variable after the first request and reused for all subsequent ones. In development (`IS_PROD = false`) the cache is bypassed so changes are reflected without restarting the server.
+Four page renderers live in `src/server/pages/`. Each one is a TypeScript function that builds an HTML content string and passes it to `renderShell()` to produce a complete document. Rendered HTML is cached in a module-level variable after the first request and reused for all subsequent ones. In development (`IS_PROD = false`) the cache is bypassed so changes are reflected without restarting the server. The results page is an exception — it is not cached in production because its content changes as new benchmark runs are submitted (a short `Cache-Control: max-age=300` header is used instead).
 
 Page-specific CSS is passed via the `extraHead` slot as an inline `<style>` block. This co-locates styles with the markup that needs them and avoids loading benchmark-specific CSS on the methodology page and vice versa.
+
+---
+
+## Pages at a Glance
+
+| URL | Renderer | JavaScript |
+|-----|----------|-----------|
+| `/` | `home.ts` | none |
+| `/benchmarks` | `benchmarks.ts` → `assembleOverviewPage()` | none |
+| `/benchmarks/compare` | `benchmarks.ts` → `assembleComparePage()` | `compare.js` |
+| `/benchmarks/results` | `benchmarks.ts` → `assembleResultsPage()` | `results.js` |
+| `/benchmarks/{slug}` | `benchmarks.ts` → `assembleLibraryPage()` | `script.js` |
+| `/methodology` | `methodology.ts` | none |
+| `/about` | `about.ts` | none |
+| `/about/api` | `about.ts` | none |
+| `/about/contribute` | `about.ts` | none |
 
 ---
 
@@ -30,9 +46,9 @@ The grid is generated from `getLibrariesByEcosystem()` so no HTML needs to be ch
 Six cards explaining the value proposition of the benchmark platform:
 - Fair Methodology — randomized execution order, GC barriers, identical DOM templates
 - Crowdsourced Data — every run is stored for aggregate trend analysis
-- 4 Key Metrics — render time, memory, scroll FPS, P95 frame time
+- 5 Key Metrics — render time, memory, scroll FPS, P95 frame time, jump
 - Stress Testing — configurable CPU burn per frame to simulate real app overhead
-- 7 Scroll Speeds — progressive testing from 720 px/s to 36,000 px/s
+- 5 Scroll Speeds — progressive testing from 1,800 px/s to 21,600 px/s
 - Open Source — source code open to review and contribution
 
 **How It Works**  
@@ -55,7 +71,7 @@ The overview renders a static header and a library grid — the same ecosystem-g
 
 Below the library cards, a "Methodology" callout box summarises the measurement approach and links to `/methodology`.
 
-The `.bench-overview__meta` strip shows four `.bench-tag` pills: the total library count, "4 metrics per run", "7 scroll speeds", and "Crowdsourced results".
+The `.bench-overview__meta` strip shows four `.bench-tag` pills: the total library count, "5 metrics per run", "5 scroll speeds", and "Crowdsourced results".
 
 ### Individual library page (`slug = "react-window"`, etc.)
 
@@ -88,6 +104,165 @@ The `.bench-page` wrapper element carries `data-library="{slug}"`. This is how `
 
 ---
 
+## Compare Page (`src/server/pages/benchmarks.ts` → `assembleComparePage()`)
+
+**URL:** `/benchmarks/compare`  
+**Active nav:** "Benchmarks"  
+**Sidebar active link:** "⚖ Compare"  
+**JavaScript shipped:** `<script type="module" src="/dist/benchmarks/compare.js">` (injected via `extraBody`)
+
+The compare page lets a visitor pick 2–4 libraries and run them head-to-head under exactly the same conditions as an individual library benchmark. Results are displayed as a metric × library table with per-cell winner badges and difference percentages.
+
+### Library Selector
+
+A surface card above the controls containing:
+- A **"Libraries" label** and an **"+ Add library" button** (disabled and dimmed when 4 slots are already open)
+- **Slot rows** — each slot has a `<select>` dropdown listing all registered libraries, a slot label ("Library 1", "Library 2", …), and a remove button (✕) that appears when more than 2 slots are present
+
+Slots are rendered and wired by `compare.js`. When a duplicate library is selected across any two slots, the Run button is disabled and a warning message appears: "Please select a different library for each slot."
+
+### Controls
+
+Identical to the individual library page: item count segmented group (10K / 100K / 1M), stress level segmented group (0 / 3 / 5 / 7 ms), and a "▶ Run Comparison" button that becomes "■ Stop" during a run. All controls are disabled while a run is in progress.
+
+### Status bar and progress
+
+A `<div id="cmp-status">` text line shows the current phase ("Running React Window (1/3)…", "✅ Complete", etc.). A slim 3px progress bar below it fills as each library's sub-phases complete. Progress is derived by `parseLocalProgress()` in `compare.js`, which maps the same status message patterns used by `script.js` (render N/5, memory N/10, scroll N/7) into a fine-grained position within each library's equal slice of the bar (0–90%), with the final 10% reserved for result rendering.
+
+### Execution order
+
+When Run is clicked, `compare.js` shuffles the selected slugs with `[...slugs].sort(() => Math.random() - 0.5)` before running. This randomises which library runs cold and which runs warm, eliminating JIT warmth and GC bleed-through bias. A GC barrier (`tryGC()` + `waitFrames(5)`) is placed between each library run. Results are always rendered in the original slot order so the columns match what the user selected.
+
+### Results table
+
+Populated by `compare.js` once all libraries have run. Structure:
+
+**Header row** — one column per library. Each column shows:
+- The library name in bold
+- A status sub-line: green "N wins" when the library won at least one metric, red "Failed" if the run threw an error, italic "Not run" if the run was aborted before this library ran
+
+**Metric rows** — one row per core metric (Render, Memory, Scroll FPS, P95 Frame, Jump). Each row has:
+- A left label column with the metric name in uppercase
+- One value cell per library, containing:
+  - The numeric value and unit in large bold type, coloured green/yellow/red based on the absolute rating thresholds from `buildMetrics()`
+  - A diff badge: `✓ best` (green) for the winner, `≈ tie` (muted) when all values are within 3% of each other, or `N% worse` (muted) relative to the winner for non-winners
+
+**Footer** — a one-line note: "Libraries ran in randomized order to reduce GC bleed-through and JIT warmth bias."
+
+### Winner detection
+
+Winner detection uses `pickWinner(entries, better)` exported from `runner.js` — the single source of truth. It accepts an array of `{ slug, value }` pairs and a `'lower' | 'higher'` direction, filters out zero/null values, and returns the winning slug, `"__tie__"` if all valid values are within 3% of each other, or `null` if fewer than 2 valid values exist. The same function and threshold are used for the per-cell diff badge calculation.
+
+### Three cell states for aborted runs
+
+If a run is aborted mid-way, libraries that never ran are absent from the `allMetrics` Map (distinguished from `null` which means "ran but failed"). The table handles three distinct states:
+
+| State | How it arises | Cell rendering |
+|-------|--------------|----------------|
+| Absent (`!allMetrics.has(slug)`) | Run aborted before this library's turn | `—` with `.cmp-results__cell--pending` (italic) |
+| `null` | Library ran but threw an error | `—` with `.cmp-results__cell--error` |
+| `BenchmarkMetric[]` | Library ran successfully | Value, unit, diff badge |
+
+### Live preview viewport
+
+Same as the individual library page — a `<div id="cmp-viewport">` that expands to 400px during the run and collapses when complete. Each library renders into a fresh sub-container inside this viewport; the previous library's DOM is cleared before the next one mounts.
+
+### CSS
+
+The compare page uses `BENCH_CSS` (shared with all benchmark pages) plus `COMPARE_CSS`, both defined as string constants in `src/server/pages/benchmarks.ts` and injected via `extraHead`. `COMPARE_CSS` covers:
+
+| Class prefix | What it covers |
+|---|---|
+| `.cmp-selector`, `.cmp-slots`, `.cmp-slot` | Library picker card and slot rows |
+| `.cmp-slot__select`, `.cmp-slot__remove` | Dropdown and remove button |
+| `.cmp-add-slot-btn` | Add library button |
+| `.cmp-status`, `.cmp-progress` | Status text and progress bar |
+| `.cmp-results`, `.cmp-results__header`, `.cmp-results__body`, `.cmp-results__row` | Results table structure |
+| `.cmp-results__col-header`, `.cmp-results__lib-name`, `.cmp-results__lib-status` | Column header content |
+| `.cmp-results__metric-label`, `.cmp-results__cell` | Row label and value cells |
+| `.cmp-diff-badge--winner`, `.cmp-diff-badge--tie`, `.cmp-diff-badge--worse` | Diff badge variants |
+| `.cmp-cell__value`, `.cmp-cell__unit`, `.cmp-cell__meta` | Cell value typography |
+| `.cmp-results__footer` | Footer note |
+
+---
+
+## Results Page (`src/server/pages/benchmarks.ts` → `assembleResultsPage()`)
+
+**URL:** `/benchmarks/results`
+**Active nav:** "Benchmarks"
+**Sidebar active link:** "📊 Results"
+**JavaScript shipped:** `<script type="module" src="/dist/benchmarks/results.js">` (injected via `extraBody`)
+
+The results page shows crowdsourced aggregated benchmark data from the SQLite database. Unlike the compare page (which runs benchmarks live in the visitor's browser), this page is fully server-rendered from stored data — no benchmark execution is needed.
+
+### Data flow
+
+`assembleResultsPage()` calls `getStats()` and `getSummary()` (exported from `src/api/benchmarks.ts`) directly on the server. The query filters by item count and stress level, which are read from URL query parameters (`?items=10000&stress=0`). The results are transformed into template-ready row objects by `buildResultRows()`, which:
+
+1. Merges stats by library slug (takes the version group with the most runs)
+2. Filters to libraries that exist in the registry (unknown slugs are skipped)
+3. Extracts the 5 core metrics (Render, Memory, Scroll FPS, P95 Frame, Jump) into typed cell objects
+4. Sorts by Scroll FPS descending (default ranking)
+5. Marks the best value per metric column
+
+### Leaderboard table
+
+The main content is an HTML `<table>` with one row per library. Columns:
+
+| Column | Content |
+|--------|---------|
+| `#` | Rank (1-based, from current sort order) |
+| Library | Name (links to `/benchmarks/{slug}`) + ecosystem badge |
+| Render | Median render time in ms |
+| Memory | Median memory usage in MB |
+| Scroll FPS | Median scroll FPS |
+| P95 Frame | Median P95 frame time in ms |
+| Jump | Median jump-to-index time in ms |
+| Runs | Sample count + confidence badge (🟢🟡⚪) |
+
+Each metric cell shows: the median value, the unit, and (when ≥ 3 samples) a p5–p95 range below the value. The best value in each column gets a green highlight via the `res-table__td--best` class.
+
+### Confidence badges
+
+Based on the `totalRuns` count for each library:
+
+- 🟢 **High confidence** — ≥ 20 runs
+- 🟡 **Moderate confidence** — 5–19 runs
+- ⚪ **Low confidence** — < 5 runs
+
+A legend below the table explains the badges.
+
+### Filter controls
+
+Item count (10K / 100K / 1M) and stress level (0 / 3 / 5 / 7 ms) segmented buttons. Clicking a filter navigates to the same page with updated query parameters (`?items=100000&stress=3`), triggering a fresh server render with the new filter applied.
+
+### Column sorting
+
+Column headers with the `res-table__th--sortable` class support client-side re-sorting. Clicking a header sorts the rows by that metric (ascending for lower-is-better metrics, descending for higher-is-better). Re-clicking toggles the direction. The active sort column is highlighted with the `res-table__th--sorted` class. Rank numbers in the `#` column are updated after each sort.
+
+### Caching
+
+Unlike other benchmark pages, the results page is **not** cached in the module-level `pageCache`. The data changes as new runs are submitted. Instead, a `Cache-Control: public, max-age=300` header is set in production (5-minute browser cache). In development, `no-cache` is used.
+
+### Empty state
+
+When no data exists for the current filter combination, a `.res-empty` card is shown with a message encouraging the visitor to run benchmarks.
+
+### CSS
+
+Results-specific styles are in the `RESULTS_CSS` constant, appended after `COMPARE_CSS`. Key classes:
+
+- `.res-table-wrap` — rounded border container with horizontal scroll on narrow screens
+- `.res-table` — full-width table with `tabular-nums` for aligned numbers
+- `.res-table__td--best` — subtle green background + green text for the winner
+- `.res-lib` — library name link with ecosystem badge
+- `.res-val`, `.res-unit`, `.res-range` — metric value formatting
+- `.res-runs__badge` — confidence emoji badge
+- `.res-legend` — horizontal legend bar below the table
+- `.res-empty` — centered empty state card
+
+---
+
 ## Methodology Page (`src/server/pages/methodology.ts`)
 
 **URL:** `/methodology`  
@@ -101,10 +276,10 @@ A long-form static documentation page. Content is hardcoded TypeScript strings �
 | Section | Content |
 |---------|---------|
 | Overview | What "live in your browser" means; neutrality guarantee |
-| What We Measure | Four metric cards: Render (ms, lower), Memory (MB, lower), Scroll FPS (fps, higher), P95 Frame Time (ms, lower) |
-| Three-Phase Measurement | Numbered cards for Phase 1 (Timing), Phase 2 (Memory), Phase 3 (Scroll) with implementation details |
+| What We Measure | Five metric cards: Render (ms, lower), Memory (MB, lower), Scroll FPS (fps, higher), P95 Frame Time (ms, lower), Jump (ms, lower) |
+| Five-Phase Measurement | Numbered cards for Phase 0 (Warmup), Phase 1 (Render), Phase 2 (Memory), Phase 3 (Scroll), Phase 4 (Jump) with implementation details |
 | Fairness Guarantees | Six list items: randomized execution order, GC barriers, identical DOM templates, same container dimensions, fresh container per run, consistent overscan |
-| 7 Scroll Speeds | Table: multiplier × px/s × description for all seven speed levels |
+| 5 Scroll Speeds | Table: multiplier × px/s × description for all five speed levels |
 | CPU Stress Testing | Table: level × burn × remaining frame budget × use case; explanation of the busy-wait burn loop |
 | Memory Measurement | Strategy (settling, delta, rejection, retries, gentle GC); limitations (Chrome-only) |
 | Scroll Architecture | Diagram showing the dual-loop design: rAF paint counter + setTimeout scroll driver |
@@ -119,7 +294,7 @@ A long-form static documentation page. Content is hardcoded TypeScript strings �
 - GC barriers (`tryGC()` + `waitFrames(5)`) are placed between library runs
 - All libraries render a 7-element DOM structure per item: avatar, content wrapper, title, subtitle, meta wrapper, badge, timestamp
 - Container dimensions are fixed: 600px height, 48px item height, overscan 5
-- Memory uses `performance.memory.usedJSHeapSize` delta; negative deltas (GC artifacts) are rejected; up to 10 attempts are made
+- Memory uses `performance.memory.usedJSHeapSize` delta; negative deltas (GC artifacts) are rejected; up to 5 attempts are made (configurable via intensity preset)
 - No personally identifiable information is collected from visitors who run benchmarks
 
 ---
@@ -181,7 +356,7 @@ Page-specific CSS lives in the `ABOUT_CSS` constant at the bottom of the file an
   2. Register in `src/server/registry.ts` (with example entry object)
   3. Install the package (`bun add my-library`)
   4. Create the adapter (full React example code block)
-  5. Import in `benchmarks/script.js`
+  5. Import in `benchmarks/headless.js` and `benchmarks/compare.js`
   6. Build and verify (`bun run seed:db && bun run build && bun run dev`)
   7. Open a pull request
 - **Template helpers** — reference cards for all four helpers (`createRealisticReactChildren`, `benchmarkTemplate`, `populateRealisticDOMChildren`, `generateRealisticItemHTML`) with one-line descriptions of when to use each
