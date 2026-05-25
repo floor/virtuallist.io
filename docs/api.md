@@ -8,7 +8,11 @@ The REST API lives in `src/api/`. It handles all `/api/*` requests, which are th
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| `POST` | `/api/benchmarks` | Store a benchmark result |
+| `POST` | `/api/run` | Start a server-side Puppeteer benchmark run |
+| `GET` | `/api/run/:id/progress` | SSE stream for live benchmark progress |
+| `GET` | `/api/run/status` | Queue status (running, queue length) |
+| `POST` | `/api/run/:id/abort` | Abort a queued or running benchmark |
+| `POST` | `/api/benchmarks` | Store a benchmark result (crowdsourced) |
 | `GET` | `/api/benchmarks/stats` | Aggregated statistics for a library |
 | `GET` | `/api/benchmarks/history` | Time-series data for a metric |
 | `GET` | `/api/benchmarks/libraries` | All library slugs that have data in the DB |
@@ -20,7 +24,7 @@ The REST API lives in `src/api/`. It handles all `/api/*` requests, which are th
 
 ## API Router (`src/api/router.ts`)
 
-`routeApi(req, url)` receives every request that reaches `handleAsync()` in the main router. It strips the `/api` prefix, leaving a sub-path such as `/benchmarks/stats`, and delegates to `routeBenchmarks()`.
+`routeApi(req, url)` receives every request that reaches `handleAsync()` in the main router. It strips the `/api` prefix, leaving a sub-path such as `/benchmarks/stats`, and delegates to `routeBenchmarks()` or `routeRun()` (for `/api/run/*` endpoints).
 
 The health check at `/api/health` returns:
 
@@ -47,9 +51,70 @@ Access-Control-Max-Age: 86400
 
 ---
 
+## Benchmark Run API (`src/api/run.ts`)
+
+The run API manages server-side benchmark execution via Puppeteer. When a visitor clicks Run on a library page, `script.js` calls `POST /api/run` to start a server-side benchmark, then consumes progress via SSE.
+
+### POST /api/run
+
+Start a benchmark run. Returns immediately with a `runId`; the benchmark executes asynchronously.
+
+**Request body:**
+
+```json
+{
+  "librarySlug": "react-window",
+  "itemCount": 10000,
+  "stressMs": 0,
+  "intensity": "default"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `librarySlug` | string | ✓ | Library slug from the registry |
+| `itemCount` | number | — | Number of items (default: 10,000) |
+| `stressMs` | number | — | CPU burn per frame in ms (default: 0) |
+| `intensity` | string | — | `"quick"`, `"default"`, or `"full"` |
+
+**Response:** `202 Accepted`
+
+```json
+{ "runId": "run_1737000000000_1", "status": "queued", "position": 0 }
+```
+
+### GET /api/run/:id/progress
+
+SSE stream for live progress. Returns `text/event-stream` with the following event types:
+
+| Event type | When | Payload |
+|------------|------|---------|
+| `connected` | On connection | `{ type, runId }` |
+| `status` | Phase updates | `{ type, runId, message, progress }` |
+| `phase-result` | Phase completes | `{ type, runId, phase, data }` |
+| `result` | Benchmark done | `{ type, runId, data, progress: 100 }` |
+| `error` | Failure | `{ type, runId, message }` |
+| `done` | Final event | `{ type, runId, message }` |
+
+If the client connects after the run completes, the stored result is replayed immediately (results are cached for 5 minutes).
+
+### GET /api/run/status
+
+Returns the current queue state.
+
+```json
+{ "running": true, "queueLength": 0, "activeRunId": "run_1737000000000_1" }
+```
+
+### POST /api/run/:id/abort
+
+Abort a queued or running benchmark. Returns `{ "runId": "...", "aborted": true }` on success.
+
+---
+
 ## POST /api/benchmarks
 
-Stores a single benchmark result. Called automatically by `persistResult()` in the browser — no manual action is needed.
+Stores a single benchmark result. Used for crowdsourced submissions from external clients. Server-side Puppeteer runs auto-persist directly — they do not go through this endpoint.
 
 ### Request body
 

@@ -6,10 +6,10 @@ Adapters are imported by **two** entry points:
 
 | Entry point | Purpose |
 |-------------|---------|
-| `benchmarks/script.js` | Individual library benchmark pages (`/benchmarks/{slug}`) |
-| `benchmarks/compare.js` | Multi-library compare page (`/benchmarks/compare`) |
+| `benchmarks/headless.js` | Puppeteer entry point — server-side benchmark execution |
+| `benchmarks/compare.js` | Client-side compare page (`/benchmarks/compare`) |
 
-Both files import every adapter. Adding a new adapter requires an import line in both files.
+Both files import every adapter. Adding a new adapter requires an import line in both files. The `script.js` entry point (individual library pages) does **not** import adapters — it triggers server-side runs via `POST /api/run`.
 
 ---
 
@@ -233,15 +233,79 @@ Returns `{ clusterize, scrollArea, id }`. `destroy()` calls `clusterize.destroy(
 
 ---
 
+### `react-virtualized.js`
+
+**Library:** react-virtualized  
+**Component:** `List`
+
+Mounts the classic `List` component with `height`, `rowCount`, `rowHeight: ITEM_HEIGHT`, `overscanRowCount: DEFAULT_OVERSCAN`, and `width`. Each row is rendered by a `rowRenderer` function returning the shared React children template.
+
+`destroy()` calls `root.unmount()`.
+
+---
+
+### `tanstack-vue-virtual.js`
+
+**Library:** @tanstack/vue-virtual  
+**Composable:** `useVirtualizer`
+
+Creates a Vue 3 app using the Composition API. The `useVirtualizer` composable provides the reactive virtual items list. Uses a string template with the compiler-included Vue build. Item data is pre-computed in a plain array.
+
+Returns `{ app, wrapper }`. `destroy()` calls `app.unmount()` and removes the wrapper.
+
+---
+
 ### `vlist.js`
 
 **Library:** @floor/vlist
 
-Mounts the zero-dependency virtual list directly into the container using `vlist({ container, items, overscan, item: { height, template } }).build()`. Uses `benchmarkTemplate` as the `item.template` function.
+Mounts the zero-dependency virtual list directly into the container using `createVList({ container, count, overscan, itemHeight, template })`. Uses `benchmarkTemplate` as the template function.
 
 Returns the vlist instance. `destroy()` calls `instance.destroy()`.
 
 ---
+
+### `vlist-react.js`
+
+**Library:** vlist-react  
+**Hook:** `useVList`
+
+React hook wrapping the `@floor/vlist` engine. Renders items via the shared React children template. The hook manages the viewport ref internally.
+
+`destroy()` calls `root.unmount()`.
+
+---
+
+### `vlist-vue.js`
+
+**Library:** vlist-vue  
+**Composable:** `useVList`
+
+Vue 3 composable wrapping the `@floor/vlist` engine. Uses a string template with pre-computed item data.
+
+Returns `{ app, wrapper }`. `destroy()` calls `app.unmount()` and removes the wrapper.
+
+---
+
+### `vlist-svelte.js`
+
+**Library:** vlist-svelte  
+**Action:** `use:vlist`
+
+Svelte action wrapping the `@floor/vlist` engine. Since the benchmark runs outside Svelte's compiler, the adapter uses the action's imperative API directly.
+
+Returns the action's destroy handle. `destroy()` calls the cleanup function.
+
+---
+
+### `vlist-solidjs.js`
+
+**Library:** vlist-solidjs  
+**Primitive:** `createVList`
+
+SolidJS primitive wrapping the `@floor/vlist` engine. Uses `solid-js/web` `render()` with the reactive VList API.
+
+Returns the dispose function. `destroy()` calls dispose.
 
 ---
 
@@ -252,7 +316,7 @@ The complete step-by-step guide is in [adding-a-library.md](./adding-a-library.m
 1. Copy `benchmarks/libraries/_TEMPLATE.js` to `benchmarks/libraries/{slug}.js`
 2. Implement `loadDependencies()`, `create()`, and `destroy()`
 3. Use `ITEM_HEIGHT`, `DEFAULT_OVERSCAN`, and the shared template helpers
-4. Import the new file in **both** `benchmarks/script.js` and `benchmarks/compare.js`
+4. Import the new file in **both** `benchmarks/headless.js` and `benchmarks/compare.js`
 5. Run `bun run build`
 
 The `_TEMPLATE.js` file is fully documented with inline comments and examples for both React and vanilla patterns.
@@ -264,11 +328,17 @@ The `_TEMPLATE.js` file is fully documented with inline comments and examples fo
 | Adapter | Status | Notes |
 |---------|--------|-------|
 | `react-window` | ✅ Implemented | |
-| `tanstack-virtual` | ✅ Implemented | Firefox compat workaround included |
+| `react-virtualized` | ✅ Implemented | Classic List component |
 | `react-virtuoso` | ✅ Implemented | |
+| `tanstack-virtual` | ✅ Implemented | Firefox compat workaround included |
 | `virtua` | ✅ Implemented | Pre-builds children array |
 | `legend-list` | ✅ Implemented | Needs validation against actual package API |
+| `vlist-react` | ✅ Implemented | useVList hook |
+| `tanstack-vue-virtual` | ✅ Implemented | Vue 3 Composition API |
 | `vue-virtual-scroller` | ✅ Implemented | |
+| `vlist-vue` | ✅ Implemented | useVList composable |
 | `tanstack-solid-virtual` | ✅ Implemented | Imperative reactive APIs (no JSX/Babel needed) |
+| `vlist-solidjs` | ✅ Implemented | createVList primitive |
+| `vlist-svelte` | ✅ Implemented | use:vlist action |
 | `clusterize` | ✅ Implemented | Pre-generates all HTML upfront |
 | `vlist` | ✅ Implemented | |

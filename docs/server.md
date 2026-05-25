@@ -10,10 +10,12 @@ The server layer lives entirely in `src/server/`. It handles every incoming HTTP
 
 1. Reads `PORT` from `src/server/config.ts`
 2. Imports `handleRequest` from `src/server/router.ts`
-3. Calls `Bun.serve({ port: PORT, fetch: handleRequest, reusePort: true })`
+3. Calls `Bun.serve({ port: PORT, fetch: handleRequest, reusePort: true, idleTimeout: 255 })`
 4. Sends `process.send("ready")` so PM2 knows the instance is accepting connections
 
 `reusePort: true` allows multiple Bun processes to bind the same port for load balancing without a separate proxy step, if needed in the future.
+
+`idleTimeout: 255` (seconds) prevents Bun from closing long-lived SSE connections used by the benchmark progress stream. Without this, SSE connections would be dropped during benchmark runs that take longer than the default timeout.
 
 ---
 
@@ -65,7 +67,8 @@ The full resolved route table:
 | `/methodology` | `resolveMethodology()` | |
 | `/about`, `/about/api`, `/about/contribute` | `resolveAbout()` | 404 for unknown sub-pages |
 | `/dist/*`, `/public/*`, `/favicon.ico` | `resolveStatic()` | 404 if file missing |
-| `/api/*` | `handleAsync()` → `routeApi()` | Only async path |
+| `/api/run/*` | `handleAsync()` → `routeApi()` → `routeRun()` | Benchmark run management (SSE) |
+| `/api/*` | `handleAsync()` → `routeApi()` → `routeBenchmarks()` | Data storage/aggregation |
 
 ### About sub-page routing
 

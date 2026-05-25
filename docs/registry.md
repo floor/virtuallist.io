@@ -47,7 +47,7 @@ Ecosystems are displayed in this order: React → Vue → SolidJS → Svelte →
 
 ---
 
-## Current Libraries
+## Current Libraries (15)
 
 ### React
 
@@ -56,13 +56,17 @@ Ecosystems are displayed in this order: React → Vue → SolidJS → Svelte →
 | `legend-list` | Legend List | `@legendapp/list` | 10 |
 | `react-virtuoso` | react-virtuoso | `react-virtuoso` | 20 |
 | `react-window` | react-window | `react-window` | 30 |
+| `react-virtualized` | react-virtualized | `react-virtualized` | 35 |
 | `tanstack-virtual` | TanStack Virtual | `@tanstack/react-virtual` | 40 |
-| `virtua` | Virtua | `virtua` | 50 |
+| `vlist-react` | VList (React) | `vlist-react` | 50 |
+| `virtua` | Virtua | `virtua` | 60 |
 
 ### Vue
 
 | Slug | Name | npm | Order |
 |------|------|-----|-------|
+| `tanstack-vue-virtual` | TanStack Virtual (Vue) | `@tanstack/vue-virtual` | 95 |
+| `vlist-vue` | VList (Vue) | `vlist-vue` | 96 |
 | `vue-virtual-scroller` | vue-virtual-scroller | `vue-virtual-scroller` | 100 |
 
 ### SolidJS
@@ -70,6 +74,13 @@ Ecosystems are displayed in this order: React → Vue → SolidJS → Svelte →
 | Slug | Name | npm | Order |
 |------|------|-----|-------|
 | `tanstack-solid-virtual` | TanStack Virtual (SolidJS) | `@tanstack/solid-virtual` | 200 |
+| `vlist-solidjs` | VList (SolidJS) | `vlist-solidjs` | 201 |
+
+### Svelte
+
+| Slug | Name | npm | Order |
+|------|------|-----|-------|
+| `vlist-svelte` | VList (Svelte) | `vlist-svelte` | 250 |
 
 ### Vanilla JS
 
@@ -119,9 +130,10 @@ This is useful when a library's adapter is broken or the package is abandoned, w
 The `order` field controls sort position within each ecosystem group. Gaps between values are intentional — they leave room to insert new libraries between existing ones without renumbering.
 
 Current gap pattern:
-- React libraries: 10, 20, 30, 40, 50 → next available: 60
-- Vue: 100 → next: 110
-- SolidJS: 200 → next: 210
+- React libraries: 10, 20, 30, 35, 40, 50, 60 → next available: 70
+- Vue: 95, 96, 100 → next: 110
+- SolidJS: 200, 201 → next: 210
+- Svelte: 250 → next: 260
 - Vanilla: 300, 310 → next: 320
 
 To add a library between two existing ones, choose a value between their `order` numbers.

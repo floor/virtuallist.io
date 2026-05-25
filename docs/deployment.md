@@ -4,7 +4,7 @@
 
 ## Overview
 
-The server is a single Bun process managed by PM2. There is no container, no build pipeline beyond `bun run build`, and no external runtime dependency beyond Bun itself. A reverse proxy (Nginx) sits in front and handles TLS termination.
+The server is a single Bun process managed by PM2. There is no container, no build pipeline beyond `bun run build`, and no external runtime dependency beyond Bun and a Chrome/Chromium installation (for Puppeteer). A reverse proxy (Nginx) sits in front and handles TLS termination.
 
 ```
 Internet → Nginx (TLS, :443) → Bun server (:3456)
@@ -15,6 +15,7 @@ Internet → Nginx (TLS, :443) → Bun server (:3456)
 ## Prerequisites
 
 - Bun ≥ 1.0 installed on the server
+- Chrome or Chromium installed (Puppeteer uses it for server-side benchmarks)
 - PM2 installed globally: `npm install -g pm2`
 - Nginx configured as a reverse proxy
 - The repository cloned at the deployment path
@@ -137,7 +138,22 @@ server {
         # Timeouts
         proxy_connect_timeout 10s;
         proxy_send_timeout    30s;
-        proxy_read_timeout    60s;
+        proxy_read_timeout    300s;
+    }
+
+    # SSE endpoints — disable buffering for real-time streaming
+    location /api/run/ {
+        proxy_pass http://127.0.0.1:3456;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 300s;
     }
 }
 ```
@@ -145,6 +161,12 @@ server {
 ### `X-Forwarded-For`
 
 Set to `$remote_addr` (not `$proxy_add_x_forwarded_for`) to prevent IP spoofing — the API rate limiter reads the first value of this header. If there is another proxy in front of Nginx, adjust accordingly.
+
+### SSE / Benchmark Streaming
+
+The `/api/run/` location block disables `proxy_buffering` so SSE events stream through Nginx in real time. Without this, Nginx buffers the entire response body before forwarding, which breaks live progress updates. The `proxy_read_timeout` is set to 300s to accommodate benchmark runs that may take several minutes (especially at `full` intensity with multiple phases).
+
+The server also sets `idleTimeout: 255` on `Bun.serve()` and sends `X-Accel-Buffering: no` on SSE responses to instruct Nginx not to buffer, as a belt-and-suspenders approach.
 
 ---
 

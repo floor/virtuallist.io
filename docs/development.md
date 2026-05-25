@@ -64,7 +64,7 @@ Runs three processes in parallel:
 
 Both run concurrently using the shell `&` operator. Output from all processes is interleaved in the terminal.
 
-**Use this when:** editing library adapters, `runner.js`, or `script.js`.
+**Use this when:** editing library adapters, `runner.js`, `headless.js`, or `compare.js`.
 
 ---
 
@@ -78,7 +78,7 @@ In production, each page is rendered once and the HTML string is stored in a mod
 
 ## Benchmark Bundle Changes
 
-Changes to files under `benchmarks/` (adapters, `runner.js`, `script.js`) require a rebuild. The server does not restart automatically when `dist/benchmarks/script.js` changes — just refresh the browser tab after the build completes.
+Changes to files under `benchmarks/` (adapters, `runner.js`, `headless.js`, `compare.js`) require a rebuild. The server does not restart automatically when `dist/benchmarks/*.js` changes — just refresh the browser tab after the build completes.
 
 ```bash
 # Rebuild after editing an adapter
@@ -117,12 +117,36 @@ See [database.md](./database.md) for the full schema.
 
 ## Running Benchmarks Locally
 
+### Browser (UI)
+
 Once the server is running:
 
 1. Open `http://localhost:3456/benchmarks/{slug}` for any library slug
 2. Click **▶ Run**
-3. Results appear as each phase completes
-4. Results are automatically POSTed to `/api/benchmarks` and stored in the local database
+3. The server executes the benchmark in headless Chrome via Puppeteer
+4. Progress streams live via SSE — results appear as each phase completes
+5. Results are auto-persisted to the local database (no client-side POST needed)
+
+### CLI
+
+The `scripts/benchmark.ts` script runs benchmarks from the terminal:
+
+```bash
+# Run all libraries at 10K items (default)
+bun run scripts/benchmark.ts
+
+# Run specific libraries with options
+bun run scripts/benchmark.ts --library vlist,react-window --items 10K,1M --intensity quick --runs 3
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--library` | all | Comma-separated library slugs |
+| `--items` | 10K | Comma-separated: 10K, 100K, 1M, or a number |
+| `--intensity` | default | quick, default, full |
+| `--runs` | 1 | Runs per library/size combo |
+
+The script starts runs via `POST /api/run`, consumes SSE progress with retry logic, and displays a terminal progress bar with sliding-window ETA. The server must be running.
 
 All seven routes return 200 before any library-specific testing is done:
 
@@ -242,9 +266,9 @@ curl "http://localhost:3456/api/benchmarks/stats?librarySlug=react-window&itemCo
 | `src/server/` | Server layer: router, renderers, shell, registry, static, sitemap |
 | `src/server/pages/` | One file per page: home, benchmarks, methodology |
 | `src/api/` | REST API: router and benchmark storage/aggregation |
-| `benchmarks/` | Client-side benchmark engine (browser JS) |
+| `benchmarks/` | Benchmark engine (runs in headless Chrome via Puppeteer) |
 | `benchmarks/libraries/` | One adapter file per library |
-| `scripts/` | One-off scripts run with `bun run` (e.g. seed-db) |
+| `scripts/` | CLI tools: seed-db, benchmark runner with progress bar |
 | `data/` | SQLite database (gitignored) |
 | `dist/` | Build output (gitignored) |
 | `public/` | Static assets served at `/public/*` |

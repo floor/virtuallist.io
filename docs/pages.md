@@ -46,9 +46,9 @@ The grid is generated from `getLibrariesByEcosystem()` so no HTML needs to be ch
 Six cards explaining the value proposition of the benchmark platform:
 - Fair Methodology — randomized execution order, GC barriers, identical DOM templates
 - Crowdsourced Data — every run is stored for aggregate trend analysis
-- 4 Key Metrics — render time, memory, scroll FPS, P95 frame time
+- 5 Key Metrics — render time, memory, scroll FPS, P95 frame time, jump
 - Stress Testing — configurable CPU burn per frame to simulate real app overhead
-- 7 Scroll Speeds — progressive testing from 720 px/s to 36,000 px/s
+- 5 Scroll Speeds — progressive testing from 1,800 px/s to 21,600 px/s
 - Open Source — source code open to review and contribution
 
 **How It Works**  
@@ -71,7 +71,7 @@ The overview renders a static header and a library grid — the same ecosystem-g
 
 Below the library cards, a "Methodology" callout box summarises the measurement approach and links to `/methodology`.
 
-The `.bench-overview__meta` strip shows four `.bench-tag` pills: the total library count, "4 metrics per run", "7 scroll speeds", and "Crowdsourced results".
+The `.bench-overview__meta` strip shows four `.bench-tag` pills: the total library count, "5 metrics per run", "5 scroll speeds", and "Crowdsourced results".
 
 ### Individual library page (`slug = "react-window"`, etc.)
 
@@ -141,7 +141,7 @@ Populated by `compare.js` once all libraries have run. Structure:
 - The library name in bold
 - A status sub-line: green "N wins" when the library won at least one metric, red "Failed" if the run threw an error, italic "Not run" if the run was aborted before this library ran
 
-**Metric rows** — one row per core metric (Render, Memory, Scroll FPS, P95 Frame). Each row has:
+**Metric rows** — one row per core metric (Render, Memory, Scroll FPS, P95 Frame, Jump). Each row has:
 - A left label column with the metric name in uppercase
 - One value cell per library, containing:
   - The numeric value and unit in large bold type, coloured green/yellow/red based on the absolute rating thresholds from `buildMetrics()`
@@ -201,7 +201,7 @@ The results page shows crowdsourced aggregated benchmark data from the SQLite da
 
 1. Merges stats by library slug (takes the version group with the most runs)
 2. Filters to libraries that exist in the registry (unknown slugs are skipped)
-3. Extracts the 4 core metrics (Render, Memory, Scroll FPS, P95 Frame) into typed cell objects
+3. Extracts the 5 core metrics (Render, Memory, Scroll FPS, P95 Frame, Jump) into typed cell objects
 4. Sorts by Scroll FPS descending (default ranking)
 5. Marks the best value per metric column
 
@@ -217,6 +217,7 @@ The main content is an HTML `<table>` with one row per library. Columns:
 | Memory | Median memory usage in MB |
 | Scroll FPS | Median scroll FPS |
 | P95 Frame | Median P95 frame time in ms |
+| Jump | Median jump-to-index time in ms |
 | Runs | Sample count + confidence badge (🟢🟡⚪) |
 
 Each metric cell shows: the median value, the unit, and (when ≥ 3 samples) a p5–p95 range below the value. The best value in each column gets a green highlight via the `res-table__td--best` class.
@@ -275,10 +276,10 @@ A long-form static documentation page. Content is hardcoded TypeScript strings �
 | Section | Content |
 |---------|---------|
 | Overview | What "live in your browser" means; neutrality guarantee |
-| What We Measure | Four metric cards: Render (ms, lower), Memory (MB, lower), Scroll FPS (fps, higher), P95 Frame Time (ms, lower) |
-| Three-Phase Measurement | Numbered cards for Phase 1 (Timing), Phase 2 (Memory), Phase 3 (Scroll) with implementation details |
+| What We Measure | Five metric cards: Render (ms, lower), Memory (MB, lower), Scroll FPS (fps, higher), P95 Frame Time (ms, lower), Jump (ms, lower) |
+| Five-Phase Measurement | Numbered cards for Phase 0 (Warmup), Phase 1 (Render), Phase 2 (Memory), Phase 3 (Scroll), Phase 4 (Jump) with implementation details |
 | Fairness Guarantees | Six list items: randomized execution order, GC barriers, identical DOM templates, same container dimensions, fresh container per run, consistent overscan |
-| 7 Scroll Speeds | Table: multiplier × px/s × description for all seven speed levels |
+| 5 Scroll Speeds | Table: multiplier × px/s × description for all five speed levels |
 | CPU Stress Testing | Table: level × burn × remaining frame budget × use case; explanation of the busy-wait burn loop |
 | Memory Measurement | Strategy (settling, delta, rejection, retries, gentle GC); limitations (Chrome-only) |
 | Scroll Architecture | Diagram showing the dual-loop design: rAF paint counter + setTimeout scroll driver |
@@ -293,7 +294,7 @@ A long-form static documentation page. Content is hardcoded TypeScript strings �
 - GC barriers (`tryGC()` + `waitFrames(5)`) are placed between library runs
 - All libraries render a 7-element DOM structure per item: avatar, content wrapper, title, subtitle, meta wrapper, badge, timestamp
 - Container dimensions are fixed: 600px height, 48px item height, overscan 5
-- Memory uses `performance.memory.usedJSHeapSize` delta; negative deltas (GC artifacts) are rejected; up to 10 attempts are made
+- Memory uses `performance.memory.usedJSHeapSize` delta; negative deltas (GC artifacts) are rejected; up to 5 attempts are made (configurable via intensity preset)
 - No personally identifiable information is collected from visitors who run benchmarks
 
 ---
@@ -355,7 +356,7 @@ Page-specific CSS lives in the `ABOUT_CSS` constant at the bottom of the file an
   2. Register in `src/server/registry.ts` (with example entry object)
   3. Install the package (`bun add my-library`)
   4. Create the adapter (full React example code block)
-  5. Import in `benchmarks/script.js`
+  5. Import in `benchmarks/headless.js` and `benchmarks/compare.js`
   6. Build and verify (`bun run seed:db && bun run build && bun run dev`)
   7. Open a pull request
 - **Template helpers** — reference cards for all four helpers (`createRealisticReactChildren`, `benchmarkTemplate`, `populateRealisticDOMChildren`, `generateRealisticItemHTML`) with one-line descriptions of when to use each

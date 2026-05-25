@@ -10,7 +10,7 @@ Known gaps, unfinished work, and planned improvements. This document reflects th
 
 **What:** A page that surfaces crowdsourced aggregate data so visitors can see benchmark results without running benchmarks themselves.
 
-**Status:** ✅ **Partially resolved.** The **Results page** (`/benchmarks/results`) now exists. It shows a server-rendered leaderboard table with median values for all 4 core metrics, confidence badges, p5–p95 ranges, best-in-column highlighting, and filters for item count + stress level. Column headers are sortable client-side.
+**Status:** ✅ **Partially resolved.** The **Results page** (`/benchmarks/results`) now exists. It shows a server-rendered leaderboard table with median values for all 5 core metrics, confidence badges, p5–p95 ranges, best-in-column highlighting, and filters for item count + stress level. Column headers are sortable client-side.
 
 **What was built:**
 - `assembleResultsPage()` in `src/server/pages/benchmarks.ts` — queries `getStats()` and `getSummary()` directly (no HTTP round-trip)
@@ -114,15 +114,15 @@ The adapter assumes `LegendList` accepts `data`, `renderItem`, `keyExtractor`, `
 
 ## Performance Improvements
 
-### Bundle splitting per ecosystem
+### Bundle splitting per ecosystem (compare page only)
 
-**Problem:** Every visitor downloads React, ReactDOM, Vue, and SolidJS even if they only benchmark a single library. The full bundle is ~1.5 MB.
+**Problem:** The compare page downloads React, ReactDOM, Vue, and SolidJS even if the visitor only compares React libraries. The full `compare.js` bundle is ~1.5 MB.
 
-**Option:** Split `script.js` into per-ecosystem chunks. A React-only page would download React + the React adapters but not Vue or SolidJS.
+**Option:** Split `compare.js` into per-ecosystem chunks. A React-only comparison would download React + the React adapters but not Vue or SolidJS.
 
-**Complexity:** High. Would require the benchmark page to know which adapters to load before the user interacts, or load adapters on demand after the page opens. Either way, dynamic `import()` calls at runtime would need to be measured carefully to ensure they do not contaminate render timing.
+**Complexity:** High. Would require the compare page to know which adapters to load before the user interacts, or load adapters on demand after selection. Either way, dynamic `import()` calls at runtime would need to be measured carefully to ensure they do not contaminate render timing.
 
-**Current stance:** Not worth the complexity at this stage. Reconsider if the bundle grows significantly or if page load time becomes a user complaint.
+**Current stance:** Not worth the complexity at this stage. Individual library benchmark pages no longer download the large bundle (they use server-side Puppeteer), so only the compare page is affected. Reconsider if page load time becomes a user complaint.
 
 ---
 
@@ -130,24 +130,26 @@ The adapter assumes `LegendList` accepts `data`, `renderItem`, `keyExtractor`, `
 
 **Problem:** The memory phase runs up to `MEMORY_ATTEMPTS` attempts, each preceded by `settleHeap()` (3 cycles × ~650 ms = ~2 seconds).
 
-**Current setting:** `MEMORY_ATTEMPTS = 5` (reduced from 10). Most valid readings come in the first 3–5 attempts, and 5 gives a reliable median while cutting Phase 2 time roughly in half. A future improvement could reduce settle time per attempt for further gains.
+**Current setting:** `MEMORY_ATTEMPTS = 5` (reduced from 10). Most valid readings come in the first 3–5 attempts, and 5 gives a reliable median while cutting Phase 2 time roughly in half. The `intensity` preset system (quick/default/full) now controls this per-run. A future improvement could reduce settle time per attempt for further gains.
 
 ---
 
 ## Potential New Libraries
 
-The following libraries are worth adding as benchmark coverage grows:
+Several previously-planned libraries have been added. The following remain as candidates:
 
-| Library | Ecosystem | npm |
-|---------|-----------|-----|
-| `@tanstack/vue-virtual` | Vue | `@tanstack/vue-virtual` |
-| `vue-virtual-scroll-grid` | Vue | `vue-virtual-scroll-grid` |
-| `solid-virtual` | SolidJS | `solid-virtual` |
-| `svelte-virtual` | Svelte | `svelte-virtual` |
-| `@lit-labs/virtualizer` | Vanilla (Lit) | `@lit-labs/virtualizer` |
-| `react-virtualized` | React | `react-virtualized` |
+| Library | Ecosystem | npm | Status |
+|---------|-----------|-----|--------|
+| ~~`@tanstack/vue-virtual`~~ | Vue | `@tanstack/vue-virtual` | ✅ Added as `tanstack-vue-virtual` |
+| ~~`react-virtualized`~~ | React | `react-virtualized` | ✅ Added as `react-virtualized` |
+| `vue-virtual-scroll-grid` | Vue | `vue-virtual-scroll-grid` | Candidate |
+| `solid-virtual` | SolidJS | `solid-virtual` | Candidate |
+| `svelte-virtual` | Svelte | `svelte-virtual` | Candidate |
+| `@lit-labs/virtualizer` | Vanilla (Lit) | `@lit-labs/virtualizer` | Candidate |
 
-Each requires a registry entry and a benchmark adapter. See [adding-a-library.md](./adding-a-library.md).
+VList framework bindings (`vlist-react`, `vlist-vue`, `vlist-svelte`, `vlist-solidjs`) have also been added. Total adapter count: **15**.
+
+Each new library requires a registry entry and a benchmark adapter. See [adding-a-library.md](./adding-a-library.md).
 
 ---
 

@@ -9,8 +9,9 @@ The build system compiles the client-side benchmark JavaScript into browser-read
 | Output file | Source | Description |
 |-------------|--------|-------------|
 | `dist/benchmarks/runner.js` | `benchmarks/runner.js` | Standalone measurement engine module |
-| `dist/benchmarks/script.js` | `benchmarks/script.js` | Full bundle: all adapters + all frameworks (~1.5 MB minified) |
-| `dist/benchmarks/compare.js` | `benchmarks/compare.js` | Compare page bundle: same adapters, compare UI (~1.5 MB minified) |
+| `dist/benchmarks/headless.js` | `benchmarks/headless.js` | Puppeteer bundle: all adapters + frameworks, no UI (~1.5 MB minified) |
+| `dist/benchmarks/script.js` | `benchmarks/script.js` | Client-side UI for individual library pages (~small, no adapters) |
+| `dist/benchmarks/compare.js` | `benchmarks/compare.js` | Compare page bundle: all adapters + compare UI (~1.5 MB minified) |
 | `dist/benchmarks/results.js` | `benchmarks/results.js` | Results page bundle: filter navigation + column sorting (~2 KB minified) |
 | `dist/benchmarks/styles.css` | `benchmarks/styles.css` | Minified benchmark CSS (placeholder if file absent) |
 
@@ -67,6 +68,7 @@ The plugin intercepts `onResolve` calls for framework package names and forces t
 | `solid-js/web` | `node_modules/solid-js/web/dist/web.js` (browser build) |
 | `solid-js/store` | `node_modules/solid-js/store/dist/store.js` (browser build) |
 | `@floor/vlist`, `@floor/vlist/*` | `node_modules/@floor/vlist` |
+| `@floor/virtuallist`, `@floor/virtuallist/*` | `node_modules/@floor/virtuallist` |
 
 ### Why SolidJS uses explicit browser builds
 
@@ -97,15 +99,17 @@ Each handler calls `require.resolve()` with `paths: ["./"]` (the project root) s
 
 ## Build Sequence
 
-The build script runs four `Bun.build()` calls sequentially:
+The build script runs five `Bun.build()` calls sequentially:
 
 1. **`runner.js`** — built first as a standalone module producing `dist/benchmarks/runner.js`. This can be imported directly by other scripts if needed.
 
-2. **`script.js`** — built second. Imports all 13 library adapters. This is where the framework deduplification plugin does most of its work.
+2. **`headless.js`** — built second. Imports all 15 library adapters and exposes the benchmark API on `window` for Puppeteer's `page.evaluate()`. This is the primary bundle for server-side benchmark execution — the framework deduplification plugin does most of its work here.
 
-3. **`compare.js`** — built third. Imports the same 13 adapters plus the compare page UI. Shares the same framework deduplication so no framework code is doubled inside the bundle itself.
+3. **`script.js`** — built third. The client-side UI for individual library pages (`/benchmarks/{slug}`). Triggers server-side runs via `POST /api/run` and consumes progress via SSE.
 
-4. **`results.js`** — built fourth. A lightweight script (~2 KB) with no framework imports — it only handles filter control navigation (item count / stress level → query params) and client-side column sorting of the server-rendered table. Does not use the framework dedupe plugin since it imports no frameworks.
+4. **`compare.js`** — built fourth. Imports all 15 adapters plus the compare page UI. Runs benchmarks client-side for head-to-head comparisons. Shares the same framework deduplication so no framework code is doubled inside the bundle itself.
+
+5. **`results.js`** — built fifth. A lightweight script (~2 KB) with no framework imports — it only handles filter control navigation (item count / stress level → query params) and client-side column sorting of the server-rendered table. Does not use the framework dedupe plugin since it imports no frameworks.
 
 If any build step fails, the script prints the error messages from `result.logs` and exits with code 1.
 
@@ -139,18 +143,20 @@ These are passed to `Bun.build()` via the `define` option. Without `__VUE_OPTION
 
 ## Bundle Size
 
-Both `script.js` and `compare.js` are approximately 1.4 MB minified. They share the same adapter imports and framework runtimes — React 19, ReactDOM 19, Vue 3 (runtime + compiler), SolidJS 1.9 — so the size is nearly identical. The difference is only the page-specific UI code (a few KB).
+Both `headless.js` and `compare.js` are approximately 1.5 MB minified. They share the same adapter imports and framework runtimes — React 19, ReactDOM 19, Vue 3 (runtime + compiler), SolidJS 1.9 — so the size is nearly identical. The difference is only the page-specific entry code (a few KB).
+
+`script.js` is lightweight — it contains only the SSE progress UI and controls logic. It does not import any library adapters or frameworks since individual library benchmarks now run server-side via Puppeteer.
 
 `results.js` is approximately 2 KB minified. It contains no framework code — only vanilla JS for DOM manipulation (filter buttons and table sorting). This is intentional: the results page is server-rendered from the database, so the client-side script only adds interactivity to the already-rendered HTML.
 
 This was a deliberate tradeoff:
 
-**Why bundle everything together?**
+**Why bundle all frameworks together in headless.js?**
 - Dynamic imports at benchmark time would add latency that contaminates render-time measurements
 - Splitting per-library would require multiple script tags and coordination logic
-- A single cached script.js is fast on repeat visits
+- The headless bundle runs in Puppeteer, not the visitor's browser — so download size is irrelevant
 
-**Implication for visitors:** The first page load on any individual library benchmark page downloads ~1.4 MB. Subsequent visits to any benchmark page use the cached bundle.
+**Implication for visitors:** The compare page is the only page that downloads ~1.5 MB (for client-side comparisons). Individual library benchmark pages download only the lightweight `script.js` and stream results from the server.
 
 ---
 
@@ -169,9 +175,10 @@ bun run build:bench:watch     # rebuild automatically as you edit
 
 # Check what was built
 ls -lh dist/benchmarks/
-# runner.js   ~11 KB
-# script.js   ~1.5 MB
-# compare.js  ~1.5 MB
-# results.js  ~2 KB
-# styles.css  ~9 KB   (vlist.css + local overrides, minified)
+# runner.js    ~11 KB
+# headless.js  ~1.5 MB   (Puppeteer bundle — all adapters + frameworks)
+# script.js    ~small     (client-side SSE UI)
+# compare.js   ~1.5 MB   (compare page — all adapters + frameworks)
+# results.js   ~2 KB
+# styles.css   ~9 KB     (vlist.css + local overrides, minified)
 ```

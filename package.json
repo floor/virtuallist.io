@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@floor/virtuallist": "^0.1.0",
-    "vlist": "file:../vlist.v2",
+    "vlist": "file:../vlist",
     "@legendapp/list": "3.0.0-beta.40",
     "@tanstack/react-virtual": "^3.13.18",
     "@tanstack/solid-virtual": "^3.13.18",

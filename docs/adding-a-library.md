@@ -11,7 +11,7 @@ Four things need to happen:
 1. Register the library in `src/server/registry.ts`
 2. Install the npm package
 3. Create a benchmark adapter in `benchmarks/libraries/{slug}.js`
-4. Import the adapter in **both** `benchmarks/script.js` and `benchmarks/compare.js`
+4. Import the adapter in **both** `benchmarks/headless.js` and `benchmarks/compare.js`
 
 Then rebuild: `bun run build`.
 
@@ -422,9 +422,9 @@ defineLibrary({
 
 ---
 
-## Step 4 — Import in script.js
+## Step 4 — Import in headless.js and compare.js
 
-Open **both** `benchmarks/script.js` and `benchmarks/compare.js` and add an import in the adapter import block of each file:
+Open **both** `benchmarks/headless.js` and `benchmarks/compare.js` and add an import in the adapter import block of each file:
 
 ```js
 // existing imports
@@ -436,7 +436,9 @@ import "./libraries/tanstack-virtual.js";
 import "./libraries/my-library.js";
 ```
 
-The import causes `defineLibrary()` to run at module evaluation time, registering the adapter with the engine before any benchmark starts. Both entry points must import every adapter — `script.js` serves the individual library benchmark pages, `compare.js` serves the `/benchmarks/compare` page, and both need the full adapter registry to function.
+The import causes `defineLibrary()` to run at module evaluation time, registering the adapter with the engine before any benchmark starts. Both entry points must import every adapter — `headless.js` is injected into Puppeteer for server-side benchmark execution, and `compare.js` runs client-side comparisons on the `/benchmarks/compare` page.
+
+Note: `script.js` (individual library pages) does **not** import adapters. It triggers server-side runs via `POST /api/run` and streams progress via SSE.
 
 ---
 
@@ -464,7 +466,7 @@ Before submitting a PR:
 - [ ] Library appears in the sidebar on `http://localhost:3456/benchmarks`
 - [ ] `/benchmarks/my-library` returns 200, not 404
 - [ ] Clicking Run starts the benchmark without a console error
-- [ ] All four core metrics complete: Render, Memory, Scroll FPS, P95 Frame
+- [ ] All five core metrics complete: Render, Memory, Scroll FPS, P95 Frame, Jump
 - [ ] The benchmark completes cleanly without hanging
 - [ ] `/sitemap.xml` includes the new library's URL
 - [ ] `ITEM_HEIGHT = 48` is used (grep the adapter for hard-coded heights)

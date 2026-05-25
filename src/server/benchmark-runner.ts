@@ -158,6 +158,7 @@ async function processQueue(): Promise<void> {
     item.resolve(result);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[benchmark-runner] Run ${item.runId} failed:`, msg);
     item.onProgress({
       type: "error",
       runId: item.runId,
@@ -379,6 +380,11 @@ async function executeRun(
     });
 
     return result;
+  } catch (err) {
+    if (pageErrors.length > 0) {
+      console.error(`[benchmark-runner] Page errors:`, pageErrors.join("\n"));
+    }
+    throw err;
   } finally {
     await page.close();
   }
