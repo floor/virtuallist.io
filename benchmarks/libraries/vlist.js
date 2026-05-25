@@ -34,8 +34,8 @@ let loadError = null;
 // a timed create() call.
 const depsReady = (async () => {
   try {
-    const mod = await import("@floor/vlist");
-    vlist = mod.vlist || mod.default || mod;
+    const mod = await import("vlist");
+    vlist = mod.createVList;
   } catch (err) {
     loadError = err;
     console.error("[vlist] Failed to load @floor/vlist:", err);
@@ -95,15 +95,12 @@ defineLibrary({
     const list = vlist({
       container,
       overscan: DEFAULT_OVERSCAN,
+      items: getItems(itemCount),
       item: {
         height: ITEM_HEIGHT,
         template: benchmarkTemplate,
       },
-    }).build();
-
-    // setItems() triggers the actual virtualisation render -- identical to
-    // how vlist.dev comparison suite measures this library.
-    list.setItems(getItems(itemCount));
+    });
 
     return list;
   },

@@ -95,8 +95,9 @@ const frameworkDedupePlugin: import("bun").BunPlugin = {
       }
     });
 
-    // @floor/vlist — resolve from project root
-    build.onResolve({ filter: /^@floor\/vlist(\/.*)?$/ }, (args) => {
+    // vlist — only resolve from our benchmark adapters, not from node_modules
+    build.onResolve({ filter: /^vlist$/ }, (args) => {
+      if (args.importer?.includes("node_modules")) return undefined;
       try {
         const resolved = require.resolve(args.path, {
           paths: [PROJECT_ROOT],
@@ -173,6 +174,7 @@ async function build(): Promise<void> {
   const entrypoint = join(BENCHMARKS_DIR, "script.js");
   const compareEntrypoint = join(BENCHMARKS_DIR, "compare.js");
   const resultsEntrypoint = join(BENCHMARKS_DIR, "results.js");
+  const headlessEntrypoint = join(BENCHMARKS_DIR, "headless.js");
   const runnerPath = join(BENCHMARKS_DIR, "runner.js");
 
   if (!existsSync(entrypoint)) {
@@ -279,6 +281,27 @@ async function build(): Promise<void> {
     }
     console.log("  ✅ results.js");
 
+    // ── Build headless.js (Puppeteer benchmark entry point) ─────────────
+    console.log("  Building headless.js...");
+    const headlessResult = await Bun.build({
+      entrypoints: [headlessEntrypoint],
+      outdir: OUT_DIR,
+      ...buildOptions(),
+      plugins: [frameworkDedupePlugin],
+      define,
+    });
+
+    if (!headlessResult.success) {
+      const errors = headlessResult.logs.map((log) => log.message).join("\n");
+      console.error("❌ Headless build failed:\n", errors);
+      console.error("\nBuild logs:");
+      headlessResult.logs.forEach((log) => {
+        console.error(`  ${log.level}: ${log.message}`);
+      });
+      process.exit(1);
+    }
+    console.log("  ✅ headless.js");
+
     // ── Collect CSS ─────────────────────────────────────────────────────
     // Bundle required stylesheets from library packages, then any local
     // overrides. Order matters — later rules win on conflicts.
@@ -287,8 +310,8 @@ async function build(): Promise<void> {
     // Libraries that require their own CSS to render correctly
     const libCssPaths: Array<{ path: string; label: string }> = [
       {
-        path: join(".", "node_modules", "@floor", "vlist", "dist", "vlist.css"),
-        label: "@floor/vlist",
+        path: join(".", "node_modules", "vlist", "dist", "vlist.css"),
+        label: "vlist",
       },
       {
         path: join(
@@ -336,12 +359,14 @@ async function build(): Promise<void> {
     const jsPath = join(OUT_DIR, "script.js");
     const compareOutPath = join(OUT_DIR, "compare.js");
     const runnerOutPath = join(OUT_DIR, "runner.js");
+    const headlessOutPath = join(OUT_DIR, "headless.js");
 
     const jsSize = Bun.file(jsPath).size;
     const compareSize = Bun.file(compareOutPath).size;
     const resultsOutPath = join(OUT_DIR, "results.js");
     const resultsSize = Bun.file(resultsOutPath).size;
     const runnerSize = Bun.file(runnerOutPath).size;
+    const headlessSize = Bun.file(headlessOutPath).size;
 
     const elapsed = (performance.now() - start).toFixed(0);
 
@@ -351,6 +376,7 @@ async function build(): Promise<void> {
   script.js   ${formatKB(jsSize)} KB
   compare.js  ${formatKB(compareSize)} KB
   results.js  ${formatKB(resultsSize)} KB
+  headless.js ${formatKB(headlessSize)} KB
   runner.js   ${formatKB(runnerSize)} KB
   Output:     ${OUT_DIR}/
     `);

@@ -20,8 +20,11 @@ export const DEFAULT_OVERSCAN = 5;
 // Measurement Parameters
 // =============================================================================
 
+/** Number of warmup iterations before measurement (JIT optimization). */
+export const WARMUP_ITERATIONS = 2;
+
 /** Number of render iterations for median calculation. */
-export const MEASURE_ITERATIONS = 3;
+export const MEASURE_ITERATIONS = 5;
 
 /** Maximum memory measurement attempts. */
 export const MEMORY_ATTEMPTS = 5;

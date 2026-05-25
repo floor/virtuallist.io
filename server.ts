@@ -32,6 +32,7 @@ Bun.serve({
   port: PORT,
   fetch: handleRequest,
   reusePort: true,
+  idleTimeout: 255,
 });
 
 // Signal PM2 cluster that this instance is ready to accept connections

@@ -45,7 +45,7 @@ export function clearBenchmarkCache(): void {
 // Constants
 // =============================================================================
 
-const ITEM_COUNTS = [10_000, 100_000, 1_000_000];
+const ITEM_COUNTS = [10_000, 1_000_000];
 const INITIAL_ITEM_COUNT = ITEM_COUNTS[0];
 
 const STRESS_LEVELS = [
@@ -1462,6 +1462,124 @@ const BENCH_CSS = `
   color: var(--text-muted);
 }
 
+/* ── Live Bar Chart ────────────────────────────────────────────────────── */
+.bench-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.25rem;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+}
+.bench-chart__status {
+  font-size: 0.8rem;
+  color: var(--accent);
+  min-height: 1.2em;
+  transition: opacity 0.3s;
+}
+.bench-chart--done .bench-chart__status {
+  opacity: 0;
+  height: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.bench-chart__row {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr 5.5rem;
+  align-items: center;
+  gap: 0.75rem;
+  opacity: 0.35;
+  transition: opacity 0.4s;
+}
+.bench-chart__row--active {
+  opacity: 0.7;
+}
+.bench-chart__row--active .bench-chart__label {
+  color: var(--accent);
+}
+.bench-chart__row--done {
+  opacity: 1;
+}
+.bench-chart__label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-align: right;
+  transition: color 0.3s;
+}
+.bench-chart__row--done .bench-chart__label {
+  color: var(--text);
+}
+.bench-chart__track {
+  position: relative;
+  height: 1.5rem;
+  background: var(--border-subtle);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.bench-chart__baseline {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  border-left: 2px dashed var(--text-muted);
+  opacity: 0.4;
+  z-index: 1;
+}
+.bench-chart__bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 0;
+  border-radius: 4px;
+  transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.bench-chart__bar--good { background: var(--green); opacity: 0.85; }
+.bench-chart__bar--ok { background: var(--yellow, #e5a100); opacity: 0.85; }
+.bench-chart__bar--bad { background: var(--red); opacity: 0.85; }
+.bench-chart__value {
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  transition: color 0.3s;
+}
+.bench-chart__row--done .bench-chart__value {
+  color: var(--text);
+}
+.bench-chart__number {
+  font-size: 0.95rem;
+}
+.bench-chart__unit {
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-left: 0.15rem;
+}
+
+/* ── Active phase shimmer ─────────────────────────────────────────────── */
+.bench-chart__row--active .bench-chart__track::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(99, 102, 241, 0.08) 50%,
+    transparent 100%
+  );
+  animation: chart-shimmer 1.5s ease-in-out infinite;
+}
+@keyframes chart-shimmer {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(200%); }
+}
+
 /* ── Error State ────────────────────────────────────────────────────────── */
 .bench-suite__error {
   padding: 1rem;
@@ -1536,6 +1654,129 @@ const BENCH_CSS = `
   .bench-metrics {
     grid-template-columns: 1fr;
   }
+}
+
+/* ── Progress View (Puppeteer runner) ─────────────────────────────────── */
+.bench-progress {
+  background: var(--bg-card, #1a1a2e);
+  border-radius: 12px;
+  padding: 1.5rem;
+  border: 1px solid var(--border, #2a2a4a);
+}
+.bench-progress__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.bench-progress__title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text, #e0e0e0);
+}
+.bench-progress__abort {
+  background: none;
+  border: 1px solid var(--border, #2a2a4a);
+  color: var(--text-dim, #888);
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+.bench-progress__abort:hover {
+  border-color: #e74c3c;
+  color: #e74c3c;
+}
+.bench-progress__bar-wrap {
+  height: 6px;
+  background: var(--bg-dim, #111);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 0.75rem;
+}
+.bench-progress__bar {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #8b5cf6);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.bench-progress__bar--done {
+  background: linear-gradient(90deg, #10b981, #34d399);
+}
+.bench-progress__bar--error {
+  background: #e74c3c;
+}
+.bench-progress__status {
+  font-size: 0.85rem;
+  color: var(--text-dim, #888);
+  margin-bottom: 1rem;
+  min-height: 1.2em;
+}
+.bench-progress__phases {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+.bench-progress__phase {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  background: var(--bg-dim, #111);
+  color: var(--text-dim, #666);
+  transition: all 0.2s;
+}
+.bench-progress__phase--active {
+  background: rgba(99, 102, 241, 0.15);
+  color: #8b5cf6;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+.bench-progress__phase--done {
+  color: #10b981;
+}
+.bench-progress__phase--done .bench-progress__phase-check::after {
+  content: "✓";
+  margin-left: 0.25rem;
+}
+.bench-progress__metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+.bench-progress__metric {
+  padding: 0.75rem;
+  border-radius: 8px;
+  background: var(--bg-dim, #111);
+  border: 1px solid var(--border, #2a2a4a);
+}
+.bench-progress__metric--good {
+  border-color: rgba(16, 185, 129, 0.3);
+}
+.bench-progress__metric--ok {
+  border-color: rgba(245, 158, 11, 0.3);
+}
+.bench-progress__metric--bad {
+  border-color: rgba(239, 68, 68, 0.3);
+}
+.bench-progress__metric-label {
+  display: block;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim, #888);
+  margin-bottom: 0.25rem;
+}
+.bench-progress__metric-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text, #e0e0e0);
 }
 `.trim();
 

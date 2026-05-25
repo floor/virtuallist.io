@@ -474,7 +474,7 @@ function validateResult(
 // Storage
 // =============================================================================
 
-function storeResult(result: BenchmarkResultInput): { runId: number } {
+export function storeResult(result: BenchmarkResultInput): { runId: number } {
   const database = getDb();
 
   const insertRun = database.prepare(`

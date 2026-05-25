@@ -21,13 +21,6 @@
       <% }) %>
     </div>
 
-    <div class="bench-controls__sep"></div>
-    <span class="bench-controls__label"><%= it.t("controls.stress_label") %></span>
-    <div class="ui-segmented" id="res-stress">
-      <% it.stressLevels.forEach(function(level, i) { %>
-      <button class="ui-segmented__btn<%= i === 0 ? ' ui-segmented__btn--active' : '' %>" data-stress="<%= level.ms %>" title="<%= level.ms === 0 ? 'No extra CPU load' : 'Burn ' + level.ms + 'ms of CPU per frame during scroll' %>"><%= level.label %></button>
-      <% }) %>
-    </div>
   </div>
 
   <!-- Results Table -->
