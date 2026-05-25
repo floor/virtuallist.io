@@ -87,7 +87,7 @@ Ecosystems are displayed in this order: React → Vue → SolidJS → Svelte →
 | Slug | Name | npm | Order |
 |------|------|-----|-------|
 | `clusterize` | Clusterize.js | `clusterize.js` | 300 |
-| `vlist` | VList | `@floor/vlist` | 310 |
+| `vlist` | vlist | `vlist` | 310 |
 
 ---
 

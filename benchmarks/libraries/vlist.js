@@ -1,8 +1,7 @@
 // benchmarks/libraries/vlist.js — VList benchmark adapter
 //
-// Registers the zero-dependency @floor/vlist with the benchmark
-// runner so it can be tested with the same measurement pipeline as every
-// other library.
+// Registers the zero-dependency vlist with the benchmark runner so it
+// can be tested with the same measurement pipeline as every other library.
 //
 // VList is a pure JavaScript virtual list with no framework dependencies.
 // It uses a template function to render items as HTML strings.
@@ -12,9 +11,6 @@
 //     to avoid measuring import() overhead during the timed render phase.
 //   - The items array is pre-built once per itemCount and cached; array
 //     construction at 1M items is non-trivial and must not be measured.
-//   - vlist is initialised without items, then setItems() is called -- this
-//     matches the vlist.dev comparison benchmark exactly and ensures the
-//     timing reflects only the virtualisation + DOM render work.
 
 import {
   defineLibrary,
@@ -27,7 +23,7 @@ import {
 // Eager dependency load
 // =============================================================================
 
-let vlist = null;
+let createVList = null;
 let loadError = null;
 
 // Load once at module evaluation time so the import() cost is never inside
@@ -35,10 +31,10 @@ let loadError = null;
 const depsReady = (async () => {
   try {
     const mod = await import("vlist");
-    vlist = mod.createVList;
+    createVList = mod.createVList;
   } catch (err) {
     loadError = err;
-    console.error("[vlist] Failed to load @floor/vlist:", err);
+    console.error("[vlist] Failed to load vlist:", err);
   }
 })();
 
@@ -70,29 +66,21 @@ defineLibrary({
   /**
    * Mount a VList instance into the container.
    *
-   * Follows the same pattern as the vlist.dev comparison benchmark:
-   *   1. Build the vlist instance (no items yet)
-   *   2. Call setItems() -- this is what triggers virtualisation + DOM render
-   *
-   * The items array is pre-built outside this function so that array
-   * allocation is never counted as part of render time.
-   *
    * @param {HTMLElement} container - DOM element to render into
    * @param {number} itemCount - Number of items in the list
    * @returns {Promise<*>} VList instance (for later destruction)
    */
   create: async (container, itemCount) => {
-    // Ensure deps are loaded (instant after first call)
     await depsReady;
 
-    if (!vlist) {
+    if (!createVList) {
       throw new Error(
-        "VList is not available -- failed to load @floor/vlist" +
+        "VList is not available -- failed to load vlist" +
           (loadError ? `: ${loadError.message}` : ""),
       );
     }
 
-    const list = vlist({
+    const list = createVList({
       container,
       overscan: DEFAULT_OVERSCAN,
       items: getItems(itemCount),

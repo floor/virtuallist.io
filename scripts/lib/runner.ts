@@ -114,6 +114,7 @@ export async function runBenchmark(opts: {
             }
 
             if (event.type === "error") {
+              console.error(`\n  [error] ${event.message || "unknown error"}`);
               clearTimeout(timeout);
               resolve(null);
               return;

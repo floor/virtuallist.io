@@ -4,7 +4,7 @@
 // the same measurement pipeline as every other library.
 //
 // vlist-svelte exports a `vlist` Svelte action — a use:vlist directive that
-// wires up a @floor/vlist instance to a DOM element imperatively. Because
+// wires up a vlist instance to a DOM element imperatively. Because
 // it's a plain action (not a component), we can use it directly without
 // spinning up a Svelte component tree or needing a Svelte compiler.
 //
@@ -75,7 +75,7 @@ defineLibrary({
    * Mount a vlist-svelte list into the container.
    *
    * Calls the vlist Svelte action directly on a plain div element. The action
-   * builds and mounts the @floor/vlist instance, calling onInstance once it
+   * builds and mounts the vlist instance, calling onInstance once it
    * is ready. We capture the vlist instance via the onInstance callback and
    * hold the action handle for cleanup.
    *

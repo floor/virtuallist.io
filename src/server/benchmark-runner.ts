@@ -193,6 +193,8 @@ async function executeRun(
   const b = await getBrowser();
   const page = await b.newPage();
 
+  const pageErrors: string[] = [];
+
   try {
     await page.setViewport({ width: 1280, height: 800 });
 
@@ -207,16 +209,13 @@ async function executeRun(
     await page.exposeFunction("__benchProgress", (event: RunProgress) => {
       onProgress(event);
     });
-
-    // Capture page errors for debugging
-    const pageErrors: string[] = [];
     page.on("console", (msg) => {
       if (msg.type() === "error") {
         pageErrors.push(msg.text());
       }
     });
     page.on("pageerror", (err) => {
-      pageErrors.push(err.message);
+      pageErrors.push(`${err.message}\n${err.stack}`);
     });
 
     // Set up the page with a container and bench-item styles
@@ -286,7 +285,6 @@ async function executeRun(
       </html>
     `);
 
-    // Inject the headless bundle as a regular script (already fully bundled)
     const bundle = getHeadlessBundle();
     await page.addScriptTag({ content: bundle });
 
@@ -310,15 +308,15 @@ async function executeRun(
       progress: 10,
     });
 
-    // Execute the benchmark
     const intensityLevel = request.intensity ?? "default";
+
     const result = await page.evaluate(
       async (slug: string, count: number, stress: number, id: string, intensityArg: string) => {
         const w = window as any;
 
         const adapter = w.__getLibrary(slug);
         if (!adapter) {
-          throw new Error(`Library "${slug}" not registered`);
+          throw new Error(`Library "${slug}" not registered. Available: ${(w.__getLibraries?.() ?? []).map((l: any) => l.slug).join(", ")}`);
         }
 
         const container = document.getElementById("bench-container")!;
@@ -382,7 +380,8 @@ async function executeRun(
     return result;
   } catch (err) {
     if (pageErrors.length > 0) {
-      console.error(`[benchmark-runner] Page errors:`, pageErrors.join("\n"));
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`${msg} | Page errors: ${pageErrors.join("; ")}`);
     }
     throw err;
   } finally {

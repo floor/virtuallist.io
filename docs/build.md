@@ -67,7 +67,7 @@ The plugin intercepts `onResolve` calls for framework package names and forces t
 | `solid-js` | `node_modules/solid-js/dist/solid.js` (browser build) |
 | `solid-js/web` | `node_modules/solid-js/web/dist/web.js` (browser build) |
 | `solid-js/store` | `node_modules/solid-js/store/dist/store.js` (browser build) |
-| `@floor/vlist`, `@floor/vlist/*` | `node_modules/@floor/vlist` |
+| `vlist`, `vlist/*` | `node_modules/vlist` |
 | `@floor/virtuallist`, `@floor/virtuallist/*` | `node_modules/@floor/virtuallist` |
 
 ### Why SolidJS uses explicit browser builds

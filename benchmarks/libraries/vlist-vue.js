@@ -3,7 +3,7 @@
 // Registers vlist-vue with the benchmark runner so it can be tested with
 // the same measurement pipeline as every other library.
 //
-// vlist-vue wraps @floor/vlist with a useVList composable for Vue 3. The
+// vlist-vue wraps vlist with a useVList composable for Vue 3. The
 // composable manages the vlist instance lifecycle and exposes a containerRef
 // that the caller attaches to a div via Vue's template ref system.
 //

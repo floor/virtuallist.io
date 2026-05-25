@@ -3,7 +3,7 @@
 // Registers vlist-solidjs with the benchmark runner so it can be tested with
 // the same measurement pipeline as every other library.
 //
-// vlist-solidjs wraps @floor/vlist with a createVList primitive for SolidJS.
+// vlist-solidjs wraps vlist with a createVList primitive for SolidJS.
 // The primitive manages the vlist instance lifecycle and exposes a setRef
 // callback that the caller attaches to a container element.
 //

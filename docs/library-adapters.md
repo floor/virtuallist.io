@@ -257,7 +257,7 @@ Returns `{ app, wrapper }`. `destroy()` calls `app.unmount()` and removes the wr
 
 ### `vlist.js`
 
-**Library:** @floor/vlist
+**Library:** vlist
 
 Mounts the zero-dependency virtual list directly into the container using `createVList({ container, count, overscan, itemHeight, template })`. Uses `benchmarkTemplate` as the template function.
 
@@ -270,7 +270,7 @@ Returns the vlist instance. `destroy()` calls `instance.destroy()`.
 **Library:** vlist-react  
 **Hook:** `useVList`
 
-React hook wrapping the `@floor/vlist` engine. Renders items via the shared React children template. The hook manages the viewport ref internally.
+React hook wrapping the `vlist` engine. Renders items via the shared React children template. The hook manages the viewport ref internally.
 
 `destroy()` calls `root.unmount()`.
 
@@ -281,7 +281,7 @@ React hook wrapping the `@floor/vlist` engine. Renders items via the shared Reac
 **Library:** vlist-vue  
 **Composable:** `useVList`
 
-Vue 3 composable wrapping the `@floor/vlist` engine. Uses a string template with pre-computed item data.
+Vue 3 composable wrapping the `vlist` engine. Uses a string template with pre-computed item data.
 
 Returns `{ app, wrapper }`. `destroy()` calls `app.unmount()` and removes the wrapper.
 
@@ -292,7 +292,7 @@ Returns `{ app, wrapper }`. `destroy()` calls `app.unmount()` and removes the wr
 **Library:** vlist-svelte  
 **Action:** `use:vlist`
 
-Svelte action wrapping the `@floor/vlist` engine. Since the benchmark runs outside Svelte's compiler, the adapter uses the action's imperative API directly.
+Svelte action wrapping the `vlist` engine. Since the benchmark runs outside Svelte's compiler, the adapter uses the action's imperative API directly.
 
 Returns the action's destroy handle. `destroy()` calls the cleanup function.
 
@@ -303,7 +303,7 @@ Returns the action's destroy handle. `destroy()` calls the cleanup function.
 **Library:** vlist-solidjs  
 **Primitive:** `createVList`
 
-SolidJS primitive wrapping the `@floor/vlist` engine. Uses `solid-js/web` `render()` with the reactive VList API.
+SolidJS primitive wrapping the `vlist` engine. Uses `solid-js/web` `render()` with the reactive VList API.
 
 Returns the dispose function. `destroy()` calls dispose.
 

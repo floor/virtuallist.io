@@ -3,7 +3,7 @@
 // Registers vlist-react with the benchmark runner so it can be tested with
 // the same measurement pipeline as every other library.
 //
-// vlist-react wraps @floor/vlist with a useVList hook for React. The hook
+// vlist-react wraps vlist with a useVList hook for React. The hook
 // manages the vlist instance lifecycle and exposes a containerRef that the
 // caller attaches to a div.
 //
