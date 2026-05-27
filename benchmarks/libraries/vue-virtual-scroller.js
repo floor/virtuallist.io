@@ -106,6 +106,7 @@ defineLibrary({
     });
 
     app.mount(wrapper);
+    await Vue.nextTick();
     return { app, wrapper };
   },
 

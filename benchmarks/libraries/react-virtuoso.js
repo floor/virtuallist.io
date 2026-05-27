@@ -17,7 +17,7 @@ import {
   createRealisticReactChildren,
 } from "../runner.js";
 
-let React = null, ReactDOM = null, Virtuoso = null, loadError = null;
+let React = null, ReactDOM = null, flushSync = null, Virtuoso = null, loadError = null;
 
 const depsReady = (async () => {
   try {
@@ -26,6 +26,8 @@ const depsReady = (async () => {
     ReactDOM = ReactDOMClient.createRoot
       ? ReactDOMClient
       : (ReactDOMClient.default ?? ReactDOMClient);
+    const ReactDOMModule = await import("react-dom");
+    flushSync = ReactDOMModule.flushSync;
     const virtuosoMod = await import("react-virtuoso");
     Virtuoso = virtuosoMod.Virtuoso;
   } catch (err) {
@@ -66,7 +68,7 @@ defineLibrary({
     });
 
     const root = ReactDOM.createRoot(container);
-    root.render(listComponent);
+    flushSync(() => root.render(listComponent));
     return root;
   },
 

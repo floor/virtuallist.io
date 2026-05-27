@@ -20,7 +20,7 @@ import {
   createRealisticReactChildren,
 } from "../runner.js";
 
-let React = null, ReactDOM = null, VList = null, loadError = null;
+let React = null, ReactDOM = null, flushSync = null, VList = null, loadError = null;
 
 const depsReady = (async () => {
   try {
@@ -29,6 +29,8 @@ const depsReady = (async () => {
     ReactDOM = ReactDOMClient.createRoot
       ? ReactDOMClient
       : (ReactDOMClient.default ?? ReactDOMClient);
+    const ReactDOMModule = await import("react-dom");
+    flushSync = ReactDOMModule.flushSync;
     const virtuaMod = await import("virtua");
     VList = virtuaMod.VList;
   } catch (err) {
@@ -82,7 +84,7 @@ defineLibrary({
     );
 
     const root = ReactDOM.createRoot(container);
-    root.render(listComponent);
+    flushSync(() => root.render(listComponent));
     return root;
   },
 

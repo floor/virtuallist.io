@@ -89,7 +89,6 @@ defineLibrary({
         height: ITEM_HEIGHT,
         template: benchmarkTemplate,
       },
-      defer: true,
     });
   },
 

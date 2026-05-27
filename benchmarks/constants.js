@@ -24,7 +24,7 @@ export const DEFAULT_OVERSCAN = 5;
 export const WARMUP_ITERATIONS = 2;
 
 /** Number of render iterations for median calculation. */
-export const MEASURE_ITERATIONS = 5;
+export const MEASURE_ITERATIONS = 7;
 
 /** Maximum memory measurement attempts. */
 export const MEMORY_ATTEMPTS = 5;

@@ -244,6 +244,8 @@ function assembleComparePage(locale: string): string {
 /** Metric labels in display order. */
 const METRIC_ORDER = [
   "Render",
+  "Render Min",
+  "Render P95",
   "Memory",
   "Scroll FPS",
   "P95 Frame",
@@ -253,10 +255,14 @@ const METRIC_ORDER = [
 /** Map a metric label to a short key used in template row objects. */
 function metricKey(
   label: string,
-): "render" | "memory" | "fps" | "p95" | "jump" {
+): "render" | "renderMin" | "renderP95" | "memory" | "fps" | "p95" | "jump" {
   switch (label) {
     case "Render":
       return "render";
+    case "Render Min":
+      return "renderMin";
+    case "Render P95":
+      return "renderP95";
     case "Memory":
       return "memory";
     case "Scroll FPS":
@@ -281,7 +287,7 @@ function confidenceTier(runs: number): "high" | "moderate" | "low" {
 function formatMetricValue(value: number, unit: string): string {
   if (unit === "fps") return value.toFixed(1);
   if (unit === "MB") return value.toFixed(2);
-  return value.toFixed(1);
+  return value.toFixed(2);
 }
 
 interface MetricCell {
@@ -299,6 +305,8 @@ interface ResultRow {
   totalRuns: number;
   confidence: "high" | "moderate" | "low";
   render: MetricCell;
+  renderMin: MetricCell;
+  renderP95: MetricCell;
   memory: MetricCell;
   fps: MetricCell;
   p95: MetricCell;
@@ -346,6 +354,8 @@ function buildResultRows(
       totalRuns: stat.totalRuns,
       confidence: confidenceTier(stat.totalRuns),
       render: emptyCell(),
+      renderMin: emptyCell(),
+      renderP95: emptyCell(),
       memory: emptyCell(),
       fps: emptyCell(),
       p95: emptyCell(),
@@ -377,7 +387,7 @@ function buildResultRows(
   });
 
   // Mark "best" per metric column
-  for (const key of ["render", "memory", "fps", "p95", "jump"] as const) {
+  for (const key of ["render", "renderMin", "renderP95", "memory", "fps", "p95", "jump"] as const) {
     const better = key === "fps" ? "higher" : "lower";
     let bestVal: number | null = null;
 

@@ -42,6 +42,7 @@ Server starts at **http://localhost:3456**.
 | `build:bench:watch` | `bun run benchmarks/build.ts --watch` | Rebuild on any change under `benchmarks/` |
 | `seed:db` | `bun run scripts/seed-db.ts` | Create `data/benchmarks.db` (no-op if file already exists) |
 | `seed:db:force` | `bun run scripts/seed-db.ts --force` | Drop and recreate the database |
+| `clear:db` | `bun run scripts/clear-db.ts` | Delete all data from the database (keeps schema intact) |
 | `test` | `bun test test/` | Run the test suite |
 | `test:watch` | `bun test --watch test/` | Run tests in watch mode |
 | `typecheck` | `tsc --noEmit` | TypeScript type check without emitting files |
@@ -236,13 +237,15 @@ See [adding-a-library.md](./adding-a-library.md) for the complete guide.
 
 Edit the entry in `src/server/registry.ts`. The server auto-reloads (in `--watch` mode) and the changes appear immediately on the next page load. No rebuild required.
 
-### Reset stored benchmark data
+### Clear stored benchmark data
 
 ```bash
+# Clear all rows but keep the schema and indexes
+bun run clear:db
+
+# Or drop and recreate from scratch
 bun run seed:db:force
 ```
-
-This drops and recreates the database. All stored results are lost.
 
 ### Check what the API returns
 
@@ -268,7 +271,7 @@ curl "http://localhost:3456/api/benchmarks/stats?librarySlug=react-window&itemCo
 | `src/api/` | REST API: router and benchmark storage/aggregation |
 | `benchmarks/` | Benchmark engine (runs in headless Chrome via Puppeteer) |
 | `benchmarks/libraries/` | One adapter file per library |
-| `scripts/` | CLI tools: seed-db, benchmark runner with progress bar |
+| `scripts/` | CLI tools: seed-db, clear-db, benchmark runner with progress bar |
 | `data/` | SQLite database (gitignored) |
 | `dist/` | Build output (gitignored) |
 | `public/` | Static assets served at `/public/*` |

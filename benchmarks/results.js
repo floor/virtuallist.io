@@ -148,7 +148,7 @@ function sortTable(tbody, metric, direction) {
 }
 
 function getMetricColIndex(metric) {
-  const order = ["Render", "Memory", "Scroll FPS", "P95 Frame", "Jump"];
+  const order = ["Render", "Render Min", "Render P95", "Memory", "Scroll FPS", "P95 Frame", "Jump"];
   return order.indexOf(metric);
 }
 

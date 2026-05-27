@@ -67,8 +67,9 @@ export async function routeApi(
   // Only handle /api/* paths
   if (!pathname.startsWith("/api/")) return null;
 
-  // Strip "/api" prefix → sub-path
-  const subPath = pathname.slice(4); // "/api/benchmarks/stats" → "/benchmarks/stats"
+  // Strip "/api" prefix → sub-path, normalize trailing slash
+  const raw = pathname.slice(4); // "/api/benchmarks/stats" → "/benchmarks/stats"
+  const subPath = raw.length > 1 && raw.endsWith("/") ? raw.slice(0, -1) : raw;
 
   // ── Benchmark Run API (Puppeteer) ──
   if (subPath.startsWith("/run")) {

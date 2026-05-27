@@ -29,6 +29,8 @@
     "table_library": "Library",
     "table_ecosystem": "Ecosystem",
     "table_render": "Render",
+    "table_render_min": "Render Min",
+    "table_render_p95": "Render P95",
     "table_memory": "Memory",
     "table_fps": "Scroll FPS",
     "table_p95": "P95 Frame",

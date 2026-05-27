@@ -32,6 +32,7 @@ import { setupVlistStyles } from "./_vlist-styles.js";
 
 let React = null,
   ReactDOM = null,
+  flushSync = null,
   createVList = null,
   loadError = null;
 
@@ -42,6 +43,8 @@ const depsReady = (async () => {
     ReactDOM = ReactDOMClient.createRoot
       ? ReactDOMClient
       : (ReactDOMClient.default ?? ReactDOMClient);
+    const ReactDOMModule = await import("react-dom");
+    flushSync = ReactDOMModule.flushSync;
     const vlistMod = await import("vlist");
     createVList = vlistMod.createVList;
   } catch (err) {
@@ -105,34 +108,34 @@ defineLibrary({
     const _createVList = createVList;
     const height = container.clientHeight || 600;
 
-    return new Promise((resolve) => {
-      function VListBenchmark() {
-        const ref = _React.useRef(null);
+    let instance = null;
 
-        _React.useEffect(() => {
-          const el = ref.current;
-          if (!el) return;
-          const list = _createVList({
-            container: el,
-            overscan: DEFAULT_OVERSCAN,
-            items: getItems(itemCount),
-            item: {
-              height: ITEM_HEIGHT,
-              template: benchmarkTemplate,
-            },
-          });
-          resolve({ root, instance: list });
-        }, []);
+    function VListBenchmark() {
+      const ref = _React.useRef(null);
 
-        return _React.createElement("div", {
-          ref,
-          style: { height: `${height}px`, width: "100%", overflow: "auto" },
+      _React.useLayoutEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        instance = _createVList({
+          container: el,
+          overscan: DEFAULT_OVERSCAN,
+          items: getItems(itemCount),
+          item: {
+            height: ITEM_HEIGHT,
+            template: benchmarkTemplate,
+          },
         });
-      }
+      }, []);
 
-      const root = ReactDOM.createRoot(container);
-      root.render(_React.createElement(VListBenchmark));
-    });
+      return _React.createElement("div", {
+        ref,
+        style: { height: `${height}px`, width: "100%", overflow: "auto" },
+      });
+    }
+
+    const root = ReactDOM.createRoot(container);
+    flushSync(() => root.render(_React.createElement(VListBenchmark)));
+    return { root, instance };
   },
 
   /**

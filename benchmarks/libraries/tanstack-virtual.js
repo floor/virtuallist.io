@@ -16,7 +16,7 @@ import {
   createRealisticReactChildren,
 } from "../runner.js";
 
-let React = null, ReactDOM = null, useVirtualizer = null, loadError = null;
+let React = null, ReactDOM = null, flushSync = null, useVirtualizer = null, loadError = null;
 
 const depsReady = (async () => {
   try {
@@ -25,6 +25,8 @@ const depsReady = (async () => {
     ReactDOM = ReactDOMClient.createRoot
       ? ReactDOMClient
       : (ReactDOMClient.default ?? ReactDOMClient);
+    const ReactDOMModule = await import("react-dom");
+    flushSync = ReactDOMModule.flushSync;
     const tanstackVirtual = await import("@tanstack/react-virtual");
     useVirtualizer = tanstackVirtual.useVirtualizer;
   } catch (err) {
@@ -116,7 +118,7 @@ defineLibrary({
     });
 
     const root = ReactDOM.createRoot(container);
-    root.render(listComponent);
+    flushSync(() => root.render(listComponent));
     return root;
   },
 

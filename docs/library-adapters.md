@@ -23,6 +23,10 @@ defineLibrary({
   name: string,       // display name
   ecosystem: string,  // "react" | "vue" | "solid" | "svelte" | "vanilla"
 
+  setup(container) {  // optional — called once before any measurement
+    // Inject CSS, configure globals, etc.
+  },
+
   async create(container, itemCount) {
     // Mount the library's virtual list into container.
     // Return an instance handle — anything that destroy() can use to clean up.
@@ -35,6 +39,8 @@ defineLibrary({
   },
 })
 ```
+
+The optional `setup()` hook runs once before Phase 0 (warmup). Use it for one-time initialization like injecting CSS stylesheets that the library needs. It is never inside the timed measurement region.
 
 ### Fairness requirements
 
@@ -155,18 +161,7 @@ Mounts a `Virtuoso` component with `totalCount`, `fixedItemHeight: ITEM_HEIGHT`,
 **Library:** virtua  
 **Component:** `VList`
 
-Virtua's `<VList>` accepts React children directly rather than a render prop. The adapter pre-builds an array of `itemCount` React elements before mounting:
-
-```js
-const children = []
-for (let i = 0; i < itemCount; i++) {
-  children.push(React.createElement("div", { key: i, className: "bench-item", style: { height: ITEM_HEIGHT } },
-    ...createRealisticReactChildren(React, i)
-  ))
-}
-```
-
-For large item counts (100K, 1M) this pre-build step is itself measurable time. This is by design — the initial render time includes all work required to display the list, including any data preparation the library requires.
+Virtua's `<VList>` accepts React children directly rather than a render prop. The adapter pre-builds and caches an array of `itemCount` React elements outside `create()` so array allocation is never measured as render time. The children array is passed directly to `React.createElement(VList, props, children)` — not spread as individual arguments, which would exceed the call stack at 1M items.
 
 `destroy()` calls `root.unmount()`.
 
@@ -268,11 +263,11 @@ Returns the vlist instance. `destroy()` calls `instance.destroy()`.
 ### `vlist-react.js`
 
 **Library:** vlist-react  
-**Hook:** `useVList`
+**API:** `createVList` (direct)
 
-React hook wrapping the `vlist` engine. Renders items via the shared React children template. The hook manages the viewport ref internally.
+Mounts a React component that creates a `vlist` instance directly via `createVList()` inside a `useEffect`. The adapter uses the core `vlist` engine rather than the `useVList` hook because the hook auto-attaches plugins (scrollbar, scale, selection, snapshots) that fail in headless Chrome's minimal DOM environment. Items are passed via `getItems(itemCount)` at creation time.
 
-`destroy()` calls `root.unmount()`.
+Returns `{ root, instance }`. `destroy()` calls `instance.destroy()` then `root.unmount()`.
 
 ---
 
@@ -333,7 +328,7 @@ The `_TEMPLATE.js` file is fully documented with inline comments and examples fo
 | `tanstack-virtual` | ✅ Implemented | Firefox compat workaround included |
 | `virtua` | ✅ Implemented | Pre-builds children array |
 | `legend-list` | ✅ Implemented | Needs validation against actual package API |
-| `vlist-react` | ✅ Implemented | useVList hook |
+| `vlist-react` | ✅ Implemented | createVList direct (not useVList hook) |
 | `tanstack-vue-virtual` | ✅ Implemented | Vue 3 Composition API |
 | `vue-virtual-scroller` | ✅ Implemented | |
 | `vlist-vue` | ✅ Implemented | useVList composable |

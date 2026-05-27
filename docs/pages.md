@@ -201,8 +201,8 @@ The results page shows crowdsourced aggregated benchmark data from the SQLite da
 
 1. Merges stats by library slug (takes the version group with the most runs)
 2. Filters to libraries that exist in the registry (unknown slugs are skipped)
-3. Extracts the 5 core metrics (Render, Memory, Scroll FPS, P95 Frame, Jump) into typed cell objects
-4. Sorts by Scroll FPS descending (default ranking)
+3. Extracts the 7 core metrics (Render, Render Min, Render P95, Memory, Scroll FPS, P95 Frame, Jump) into typed cell objects
+4. Sorts by Render time ascending (default ranking)
 5. Marks the best value per metric column
 
 ### Leaderboard table
@@ -213,7 +213,9 @@ The main content is an HTML `<table>` with one row per library. Columns:
 |--------|---------|
 | `#` | Rank (1-based, from current sort order) |
 | Library | Name (links to `/benchmarks/{slug}`) + ecosystem badge |
-| Render | Median render time in ms |
+| Render | Median render time in ms (2dp) |
+| Render Min | Minimum render time in ms (2dp) |
+| Render P95 | 95th percentile render time in ms (2dp) |
 | Memory | Median memory usage in MB |
 | Scroll FPS | Median scroll FPS |
 | P95 Frame | Median P95 frame time in ms |

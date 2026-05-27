@@ -109,13 +109,23 @@ The database is accessed in three ways:
 
 ---
 
-## Seed Script (`scripts/seed-db.ts`)
+## Database Scripts
+
+### Seed (`scripts/seed-db.ts`)
 
 Creates `data/benchmarks.db` from scratch.
 
 ```bash
 bun run seed:db          # create (no-op if file already exists)
 bun run seed:db:force    # drop and recreate
+```
+
+### Clear (`scripts/clear-db.ts`)
+
+Deletes all rows from both tables while keeping the schema and indexes intact.
+
+```bash
+bun run clear:db
 ```
 
 The script:

@@ -453,8 +453,8 @@ export const measureMemoryWithRetries = async ({
  */
 export const INTENSITY_PRESETS = {
   quick:   { warmupIterations: 1, renderIterations: 3, memoryAttempts: 3, scrollDurationMs: 1000, jumpIterations: 3 },
-  default: { warmupIterations: 2, renderIterations: 5, memoryAttempts: 5, scrollDurationMs: 1500, jumpIterations: 5 },
-  full:    { warmupIterations: 3, renderIterations: 7, memoryAttempts: 5, scrollDurationMs: 2000, jumpIterations: 7 },
+  default: { warmupIterations: 2, renderIterations: 7, memoryAttempts: 5, scrollDurationMs: 1500, jumpIterations: 5 },
+  full:    { warmupIterations: 3, renderIterations: 9, memoryAttempts: 5, scrollDurationMs: 2000, jumpIterations: 7 },
 };
 
 export const benchmarkLibrary = async ({
@@ -533,12 +533,18 @@ export const benchmarkLibrary = async ({
     await destroyComponent(instance);
     container.innerHTML = "";
     await tryGC();
+
+    // Settle between iterations
+    await waitFrames(5);
   }
 
   container.style.visibility = originalVisibility;
 
-  const renderTime = round(median(renderTimes), 1);
-  onStatus(`Render times: [${renderTimes.map(t => round(t, 2)).join(", ")}] → median ${renderTime}ms`);
+  const sorted = [...renderTimes].sort((a, b) => a - b);
+  const renderTime = round(median(renderTimes), 2);
+  const renderMin = round(sorted[0], 2);
+  const renderP95 = round(percentile(sorted, 95), 2);
+  onStatus(`Render times: [${renderTimes.map(t => round(t, 2)).join(", ")}] → median ${renderTime}ms, min ${renderMin}ms, p95 ${renderP95}ms`);
   if (onPhaseResult) onPhaseResult("render", renderTime);
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -637,6 +643,8 @@ export const benchmarkLibrary = async ({
   return {
     library: libraryName,
     renderTime,
+    renderMin,
+    renderP95,
     memoryUsed,
     scrollResults,
     avgFPS,
@@ -691,7 +699,7 @@ export const rateHigher = (value, goodThreshold, okThreshold) => {
 export const buildMetrics = (results) => {
   const metrics = [];
 
-  // Render time
+  // Render time (median)
   metrics.push({
     label: "Render",
     value: results.renderTime,
@@ -699,6 +707,28 @@ export const buildMetrics = (results) => {
     better: "lower",
     rating: rateLower(results.renderTime, 15, 50),
   });
+
+  // Render min
+  if (results.renderMin != null) {
+    metrics.push({
+      label: "Render Min",
+      value: results.renderMin,
+      unit: "ms",
+      better: "lower",
+      rating: rateLower(results.renderMin, 15, 50),
+    });
+  }
+
+  // Render p95
+  if (results.renderP95 != null) {
+    metrics.push({
+      label: "Render P95",
+      value: results.renderP95,
+      unit: "ms",
+      better: "lower",
+      rating: rateLower(results.renderP95, 15, 50),
+    });
+  }
 
   // Memory
   if (results.memoryUsed !== null) {
@@ -937,7 +967,7 @@ export const persistResult = (result, extraData = {}) => {
       screenHeight: screen.height,
     };
 
-    fetch("/api/benchmarks", {
+    fetch("/api/benchmarks/", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),

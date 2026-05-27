@@ -14,6 +14,7 @@
     "build:bench:watch": "bun run benchmarks/build.ts --watch",
     "seed:db": "bun run scripts/seed-db.ts",
     "seed:db:force": "bun run scripts/seed-db.ts --force",
+    "clear:db": "bun run scripts/clear-db.ts",
     "test": "bun test test/",
     "test:watch": "bun test --watch test/",
     "typecheck": "tsc --noEmit"

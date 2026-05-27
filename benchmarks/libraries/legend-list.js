@@ -35,6 +35,7 @@ import {
 
 let React = null,
   ReactDOM = null,
+  flushSync = null,
   LegendList = null,
   loadError = null;
 
@@ -45,6 +46,8 @@ const depsReady = (async () => {
     ReactDOM = ReactDOMClient.createRoot
       ? ReactDOMClient
       : (ReactDOMClient.default ?? ReactDOMClient);
+    const ReactDOMModule = await import("react-dom");
+    flushSync = ReactDOMModule.flushSync;
     const legendMod = await import("@legendapp/list");
     LegendList = legendMod.LegendList || legendMod.default;
   } catch (err) {
@@ -133,7 +136,7 @@ defineLibrary({
     });
 
     const root = ReactDOM.createRoot(container);
-    root.render(listComponent);
+    flushSync(() => root.render(listComponent));
     return root;
   },
 

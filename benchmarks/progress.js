@@ -27,7 +27,7 @@ let onComplete = null;
  * @returns {Promise<string>} runId
  */
 export async function startRun({ librarySlug, itemCount = 10_000, stressMs = 0 }) {
-  const res = await fetch("/api/run", {
+  const res = await fetch("/api/run/", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ librarySlug, itemCount, stressMs }),

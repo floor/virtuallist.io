@@ -65,7 +65,7 @@ defineLibrary({
 |----------|-------|---------|
 | `ITEM_HEIGHT` | `48` px | Fixed row height used by every library. Must be identical across all adapters. |
 | `WARMUP_ITERATIONS` | `2` | JIT warmup iterations before measurement (not timed). |
-| `MEASURE_ITERATIONS` | `5` | Number of render timing iterations. Median is reported. |
+| `MEASURE_ITERATIONS` | `7` | Number of render timing iterations. Median, min, and p95 are reported. |
 | `MEMORY_ATTEMPTS` | `5` | Maximum memory measurement attempts. |
 | `SCROLL_DURATION_MS` | `1500` | Duration of each scroll speed test in milliseconds. |
 | `BASE_SCROLL_SPEED` | `7200` | Base scroll speed in px/s (1× multiplier). |
@@ -80,8 +80,8 @@ Intensity presets control how thorough each measurement phase is. They are selec
 | Preset | Warmup | Render Iters | Memory Attempts | Scroll Duration | Jump Iters | ~Time/Library |
 |--------|--------|-------------|-----------------|-----------------|------------|---------------|
 | `quick` | 1 | 3 | 3 | 1000ms | 3 | ~20s |
-| `default` | 2 | 5 | 5 | 1500ms | 5 | ~40s |
-| `full` | 3 | 7 | 5 | 2000ms | 7 | ~60s+ |
+| `default` | 2 | 7 | 5 | 1500ms | 5 | ~50s |
+| `full` | 3 | 9 | 5 | 2000ms | 7 | ~70s+ |
 
 ### `SCROLL_SPEEDS`
 
@@ -211,9 +211,13 @@ for i in [0 .. renderIterations - 1]:
     await destroyComponent(instance)
     container.innerHTML = ""
     tryGC()
+    await waitFrames(5)              ← settle between iterations
 
 container.style.visibility = originalValue
-renderTime = median(renderTimes)
+sorted = [...renderTimes].sort()
+renderTime = median(renderTimes)     ← 2dp precision
+renderMin  = sorted[0]
+renderP95  = percentile(sorted, 95)
 ```
 
 **Key methodology detail:** `nextFrame()` is called **before** the timer (to settle) and **after** (to verify paint). It is NOT inside the `measureDuration` callback. The timer measures only JS execution time, not paint time. A DOM validation check on the first iteration verifies that `[data-index]` elements were actually rendered.
@@ -249,7 +253,9 @@ For each target fraction (0.1, 0.3, 0.5, 0.7, 0.9), the viewport is reset to a n
 ```js
 {
   library: string,
-  renderTime: number,        // median render time (ms)
+  renderTime: number,        // median render time (ms, 2dp)
+  renderMin: number,         // minimum render time (ms, 2dp)
+  renderP95: number,         // 95th percentile render time (ms, 2dp)
   memoryUsed: number | null, // MB, or null if memory API unavailable
   scrollResults: Array<{
     speedId, speedLabel, pxPerSec,
@@ -270,6 +276,8 @@ For each target fraction (0.1, 0.3, 0.5, 0.7, 0.9), the viewport is reset to a n
 | Metric label | Source | Unit | Direction | Rating thresholds |
 |-------------|--------|------|-----------|------------------|
 | `Render` | `results.renderTime` | ms | lower | ≤15ms good, ≤50ms ok |
+| `Render Min` | `results.renderMin` | ms | lower | ≤15ms good, ≤50ms ok |
+| `Render P95` | `results.renderP95` | ms | lower | ≤15ms good, ≤50ms ok |
 | `Memory` | `results.memoryUsed` | MB | lower | ≤1MB good, ≤5MB ok |
 | `Scroll FPS` | `results.avgFPS` | fps | higher | ≥100fps good, ≥55fps ok |
 | `P95 Frame` | `results.avgP95` | ms | lower | ≤12ms good, ≤20ms ok |

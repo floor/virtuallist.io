@@ -36,6 +36,8 @@
           <th class="res-table__th res-table__th--rank">#</th>
           <th class="res-table__th res-table__th--library"><%= it.t("results.table_library") %></th>
           <th class="res-table__th res-table__th--metric res-table__th--sortable res-table__th--sorted" data-metric="Render" data-better="lower"><%= it.t("results.table_render") %></th>
+          <th class="res-table__th res-table__th--metric res-table__th--sortable" data-metric="Render Min" data-better="lower"><%= it.t("results.table_render_min") %></th>
+          <th class="res-table__th res-table__th--metric res-table__th--sortable" data-metric="Render P95" data-better="lower"><%= it.t("results.table_render_p95") %></th>
           <th class="res-table__th res-table__th--metric res-table__th--sortable" data-metric="Memory" data-better="lower"><%= it.t("results.table_memory") %></th>
           <th class="res-table__th res-table__th--metric res-table__th--sortable" data-metric="Scroll FPS" data-better="higher"><%= it.t("results.table_fps") %></th>
           <th class="res-table__th res-table__th--metric res-table__th--sortable" data-metric="P95 Frame" data-better="lower"><%= it.t("results.table_p95") %></th>
@@ -59,6 +61,28 @@
             <span class="res-unit"><%= row.render.unit %></span>
             <% if (row.render.range) { %>
             <span class="res-range"><%= row.render.range %></span>
+            <% } %>
+            <% } else { %>
+            <span class="res-nodata"><%= it.t("results.no_data") %></span>
+            <% } %>
+          </td>
+          <td class="res-table__td res-table__td--metric<%= row.renderMin.best ? ' res-table__td--best' : '' %>" data-value="<%= row.renderMin.value %>">
+            <% if (row.renderMin.value !== null) { %>
+            <span class="res-val"><%= row.renderMin.display %></span>
+            <span class="res-unit"><%= row.renderMin.unit %></span>
+            <% if (row.renderMin.range) { %>
+            <span class="res-range"><%= row.renderMin.range %></span>
+            <% } %>
+            <% } else { %>
+            <span class="res-nodata"><%= it.t("results.no_data") %></span>
+            <% } %>
+          </td>
+          <td class="res-table__td res-table__td--metric<%= row.renderP95.best ? ' res-table__td--best' : '' %>" data-value="<%= row.renderP95.value %>">
+            <% if (row.renderP95.value !== null) { %>
+            <span class="res-val"><%= row.renderP95.display %></span>
+            <span class="res-unit"><%= row.renderP95.unit %></span>
+            <% if (row.renderP95.range) { %>
+            <span class="res-range"><%= row.renderP95.range %></span>
             <% } %>
             <% } else { %>
             <span class="res-nodata"><%= it.t("results.no_data") %></span>

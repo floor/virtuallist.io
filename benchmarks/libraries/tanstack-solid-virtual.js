@@ -163,6 +163,10 @@ defineLibrary({
       return parentEl;
     }, container);
 
+    // Wait for the microtask that sets scrollEl — this triggers
+    // createEffect synchronously, rendering the virtual items into the DOM.
+    await new Promise((resolve) => queueMicrotask(resolve));
+
     return dispose;
   },
 

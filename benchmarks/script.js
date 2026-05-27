@@ -247,7 +247,7 @@ async function handleRunClick() {
   buildChart();
 
   try {
-    const res = await fetch("/api/run", {
+    const res = await fetch("/api/run/", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ librarySlug, itemCount: selectedItemCount }),
