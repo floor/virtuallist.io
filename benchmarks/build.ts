@@ -131,6 +131,15 @@ const buildOptions = () => ({
   sourcemap: isWatch ? ("inline" as const) : ("none" as const),
 });
 
+// Adapter bundles skip identifier mangling — Bun's minifier corrupts
+// CJS interop for some libraries (e.g. Clusterize.js uses `this` in
+// UMD factories that breaks when identifiers are mangled).
+const adapterBuildOptions = () => ({
+  ...BUILD_OPTIONS,
+  minify: isWatch ? false : { whitespace: true, syntax: true, identifiers: false },
+  sourcemap: isWatch ? ("inline" as const) : ("none" as const),
+});
+
 // =============================================================================
 // CSS minifier (simple, no dependencies)
 // =============================================================================
@@ -328,7 +337,7 @@ async function build(): Promise<void> {
           entrypoints: [join(ADAPTERS_DIR, file)],
           outdir: ADAPTERS_OUT,
           naming: `${slug}.js`,
-          ...buildOptions(),
+          ...adapterBuildOptions(),
           plugins: [adapterRunnerShimPlugin, frameworkDedupePlugin],
           define,
         });

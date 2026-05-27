@@ -295,7 +295,7 @@ async function executeRun(
     `);
 
     const baseBundle = getBaseBundle();
-    await page.addScriptTag({ content: baseBundle });
+    await page.addScriptTag({ content: `(function(){${baseBundle}})()` });
 
     try {
       await page.waitForFunction(
@@ -313,7 +313,7 @@ async function executeRun(
     // Load the specific adapter — isolated so its failure doesn't block other libraries
     const adapterBundle = getAdapterBundle(librarySlug);
     pageErrors.length = 0;
-    await page.addScriptTag({ content: adapterBundle });
+    await page.addScriptTag({ content: `(function(){${adapterBundle}})()` });
 
     const registered = await page.evaluate(
       (slug: string) => !!(window as any).__getLibrary(slug),
