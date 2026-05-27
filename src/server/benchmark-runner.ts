@@ -9,7 +9,7 @@
 // Queue ensures only one benchmark runs at a time (CPU contention skews results).
 
 import puppeteer, { type Browser } from "puppeteer";
-import { readFileSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { resolve } from "path";
 
 // =============================================================================
@@ -92,8 +92,16 @@ export async function closeBrowser(): Promise<void> {
 
 const DIST_DIR = resolve(import.meta.dir, "../../dist/benchmarks");
 
-function getHeadlessBundle(): string {
-  return readFileSync(resolve(DIST_DIR, "headless.js"), "utf-8");
+function getBaseBundle(): string {
+  return readFileSync(resolve(DIST_DIR, "headless-base.js"), "utf-8");
+}
+
+function getAdapterBundle(slug: string): string {
+  const path = resolve(DIST_DIR, "adapters", `${slug}.js`);
+  if (!existsSync(path)) {
+    throw new Error(`No adapter bundle for "${slug}" — rebuild benchmarks`);
+  }
+  return readFileSync(path, "utf-8");
 }
 
 
@@ -286,8 +294,8 @@ async function executeRun(
       </html>
     `);
 
-    const bundle = getHeadlessBundle();
-    await page.addScriptTag({ content: bundle });
+    const baseBundle = getBaseBundle();
+    await page.addScriptTag({ content: baseBundle });
 
     try {
       await page.waitForFunction(
@@ -297,9 +305,25 @@ async function executeRun(
     } catch {
       const ready = await page.evaluate(() => (window as any).__benchReady).catch(() => "eval-failed");
       const errorMsg = pageErrors.length > 0
-        ? `Script failed to load: ${pageErrors.join("; ")}`
-        : `Script failed to load (__benchReady=${ready})`;
+        ? `Base bundle failed to load: ${pageErrors.join("; ")}`
+        : `Base bundle failed to load (__benchReady=${ready})`;
       throw new Error(errorMsg);
+    }
+
+    // Load the specific adapter — isolated so its failure doesn't block other libraries
+    const adapterBundle = getAdapterBundle(librarySlug);
+    pageErrors.length = 0;
+    await page.addScriptTag({ content: adapterBundle });
+
+    const registered = await page.evaluate(
+      (slug: string) => !!(window as any).__getLibrary(slug),
+      librarySlug,
+    );
+    if (!registered) {
+      const errorDetail = pageErrors.length > 0
+        ? pageErrors.join("; ")
+        : "adapter script failed during evaluation";
+      throw new Error(`Library "${librarySlug}" failed to load: ${errorDetail}`);
     }
 
     onProgress({

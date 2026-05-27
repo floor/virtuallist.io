@@ -6,8 +6,8 @@
 //   bun run benchmarks/build.ts
 //   bun run benchmarks/build.ts --watch
 
-import { existsSync, readFileSync, writeFileSync, watch } from "fs";
-import { join } from "path";
+import { existsSync, readFileSync, readdirSync, writeFileSync, watch } from "fs";
+import { join, resolve } from "path";
 
 const isWatch = process.argv.includes("--watch");
 const BENCHMARKS_DIR = "./benchmarks";
@@ -110,6 +110,17 @@ const frameworkDedupePlugin: import("bun").BunPlugin = {
   },
 };
 
+// Per-adapter builds redirect ../runner.js imports to the global shim
+// so adapters read from window globals set by headless-base.js.
+const adapterRunnerShimPlugin: import("bun").BunPlugin = {
+  name: "adapter-runner-shim",
+  setup(build) {
+    build.onResolve({ filter: /\.\.\/runner\.js$/ }, () => {
+      return { path: resolve("./benchmarks/runner-global.js") };
+    });
+  },
+};
+
 // =============================================================================
 // Build options factory
 // =============================================================================
@@ -174,7 +185,6 @@ async function build(): Promise<void> {
   const entrypoint = join(BENCHMARKS_DIR, "script.js");
   const compareEntrypoint = join(BENCHMARKS_DIR, "compare.js");
   const resultsEntrypoint = join(BENCHMARKS_DIR, "results.js");
-  const headlessEntrypoint = join(BENCHMARKS_DIR, "headless.js");
   const runnerPath = join(BENCHMARKS_DIR, "runner.js");
 
   if (!existsSync(entrypoint)) {
@@ -281,26 +291,60 @@ async function build(): Promise<void> {
     }
     console.log("  ✅ results.js");
 
-    // ── Build headless.js (Puppeteer benchmark entry point) ─────────────
-    console.log("  Building headless.js...");
-    const headlessResult = await Bun.build({
-      entrypoints: [headlessEntrypoint],
+    // ── Build headless-base.js (Puppeteer runner API, no adapters) ───────
+    const headlessBaseEntrypoint = join(BENCHMARKS_DIR, "headless-base.js");
+    console.log("  Building headless-base.js...");
+    const headlessBaseResult = await Bun.build({
+      entrypoints: [headlessBaseEntrypoint],
       outdir: OUT_DIR,
       ...buildOptions(),
       plugins: [frameworkDedupePlugin],
       define,
     });
 
-    if (!headlessResult.success) {
-      const errors = headlessResult.logs.map((log) => log.message).join("\n");
-      console.error("❌ Headless build failed:\n", errors);
-      console.error("\nBuild logs:");
-      headlessResult.logs.forEach((log) => {
-        console.error(`  ${log.level}: ${log.message}`);
-      });
+    if (!headlessBaseResult.success) {
+      const errors = headlessBaseResult.logs.map((log) => log.message).join("\n");
+      console.error("❌ Headless base build failed:\n", errors);
       process.exit(1);
     }
-    console.log("  ✅ headless.js");
+    console.log("  ✅ headless-base.js");
+
+    // ── Build per-adapter bundles (one per library) ─────────────────────
+    // Each adapter is isolated — a crash in one (e.g. SolidJS module init)
+    // doesn't prevent other libraries from being benchmarked.
+    const ADAPTERS_DIR = join(BENCHMARKS_DIR, "libraries");
+    const ADAPTERS_OUT = join(OUT_DIR, "adapters");
+    ensureDir(ADAPTERS_OUT);
+
+    const adapterFiles = readdirSync(ADAPTERS_DIR)
+      .filter((f) => f.endsWith(".js") && !f.startsWith("_"));
+
+    console.log(`  Building ${adapterFiles.length} adapter bundles...`);
+
+    const adapterResults = await Promise.all(
+      adapterFiles.map(async (file) => {
+        const slug = file.replace(/\.js$/, "");
+        const result = await Bun.build({
+          entrypoints: [join(ADAPTERS_DIR, file)],
+          outdir: ADAPTERS_OUT,
+          naming: `${slug}.js`,
+          ...buildOptions(),
+          plugins: [adapterRunnerShimPlugin, frameworkDedupePlugin],
+          define,
+        });
+        return { slug, result };
+      }),
+    );
+
+    let adaptersFailed = 0;
+    for (const { slug, result } of adapterResults) {
+      if (!result.success) {
+        adaptersFailed++;
+        const errors = result.logs.map((log) => log.message).join("; ");
+        console.error(`  ❌ ${slug}: ${errors}`);
+      }
+    }
+    console.log(`  ✅ ${adapterFiles.length - adaptersFailed}/${adapterFiles.length} adapters built`);
 
     // ── Collect CSS ─────────────────────────────────────────────────────
     // Bundle required stylesheets from library packages, then any local
@@ -359,26 +403,34 @@ async function build(): Promise<void> {
     const jsPath = join(OUT_DIR, "script.js");
     const compareOutPath = join(OUT_DIR, "compare.js");
     const runnerOutPath = join(OUT_DIR, "runner.js");
-    const headlessOutPath = join(OUT_DIR, "headless.js");
+    const headlessBaseOutPath = join(OUT_DIR, "headless-base.js");
 
     const jsSize = Bun.file(jsPath).size;
     const compareSize = Bun.file(compareOutPath).size;
     const resultsOutPath = join(OUT_DIR, "results.js");
     const resultsSize = Bun.file(resultsOutPath).size;
     const runnerSize = Bun.file(runnerOutPath).size;
-    const headlessSize = Bun.file(headlessOutPath).size;
+    const baseSize = Bun.file(headlessBaseOutPath).size;
+
+    let totalAdapterSize = 0;
+    for (const file of adapterFiles) {
+      const slug = file.replace(/\.js$/, "");
+      const p = join(ADAPTERS_OUT, `${slug}.js`);
+      if (existsSync(p)) totalAdapterSize += Bun.file(p).size;
+    }
 
     const elapsed = (performance.now() - start).toFixed(0);
 
     console.log(`
   ✅ Build complete in ${elapsed}ms
 
-  script.js   ${formatKB(jsSize)} KB
-  compare.js  ${formatKB(compareSize)} KB
-  results.js  ${formatKB(resultsSize)} KB
-  headless.js ${formatKB(headlessSize)} KB
-  runner.js   ${formatKB(runnerSize)} KB
-  Output:     ${OUT_DIR}/
+  script.js        ${formatKB(jsSize)} KB
+  compare.js       ${formatKB(compareSize)} KB
+  results.js       ${formatKB(resultsSize)} KB
+  headless-base.js ${formatKB(baseSize)} KB
+  adapters/        ${formatKB(totalAdapterSize)} KB total (${adapterFiles.length} bundles)
+  runner.js        ${formatKB(runnerSize)} KB
+  Output:          ${OUT_DIR}/
     `);
   } catch (err) {
     console.error(
