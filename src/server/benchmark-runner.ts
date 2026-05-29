@@ -47,6 +47,8 @@ interface QueueItem {
 // =============================================================================
 
 let browser: Browser | null = null;
+let browserIdleTimer: ReturnType<typeof setTimeout> | null = null;
+const BROWSER_IDLE_MS = 60_000;
 const queue: QueueItem[] = [];
 let running = false;
 const activeRuns = new Map<string, { abort: () => void }>();
@@ -69,7 +71,22 @@ const CHROME_FLAGS = [
   "--disable-renderer-backgrounding",
 ];
 
+function clearIdleTimer(): void {
+  if (browserIdleTimer) {
+    clearTimeout(browserIdleTimer);
+    browserIdleTimer = null;
+  }
+}
+
+function resetIdleTimer(): void {
+  clearIdleTimer();
+  browserIdleTimer = setTimeout(() => {
+    closeBrowser();
+  }, BROWSER_IDLE_MS);
+}
+
 async function getBrowser(): Promise<Browser> {
+  clearIdleTimer();
   if (!browser || !browser.connected) {
     browser = await puppeteer.launch({
       headless: true,
@@ -80,6 +97,7 @@ async function getBrowser(): Promise<Browser> {
 }
 
 export async function closeBrowser(): Promise<void> {
+  clearIdleTimer();
   if (browser) {
     await browser.close();
     browser = null;
@@ -177,6 +195,9 @@ async function processQueue(): Promise<void> {
   } finally {
     activeRuns.delete(item.runId);
     running = false;
+    if (queue.length === 0) {
+      resetIdleTimer();
+    }
     processQueue();
   }
 }

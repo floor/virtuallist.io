@@ -12,6 +12,7 @@
 
 import { PORT } from "./src/server/config";
 import { handleRequest } from "./src/server/router";
+import { closeBrowser } from "./src/server/benchmark-runner";
 
 // =============================================================================
 // Start
@@ -37,3 +38,11 @@ Bun.serve({
 
 // Signal PM2 cluster that this instance is ready to accept connections
 if (process.send) process.send("ready");
+
+// Clean up Puppeteer browser on shutdown
+for (const sig of ["SIGINT", "SIGTERM"] as const) {
+  process.on(sig, async () => {
+    await closeBrowser();
+    process.exit(0);
+  });
+}
